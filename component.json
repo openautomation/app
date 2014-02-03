@@ -13,12 +13,16 @@
     "intron/transform-bounds": "*",
     "visionmedia/superagent": "*",
     "wout/svg.js": "*",
-    "component/inherit": "*"
+    "component/inherit": "*",
+    "tower/resource": "*",
+    "tower/query": "*",
+    "tower/adapter": "*"
   },
   "development": {},
   "license": "MIT",
   "main": "index.js",
   "scripts": [
+    "lib/rest.js",
     "lib/sprite.js",
     "lib/microplate.js",
     "lib/liquid-container.js",

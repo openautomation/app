@@ -5332,6 +5332,4127 @@ module.exports = function(a, b){
   a.prototype.constructor = a;
 };
 });
+require.register("component-indexof/index.js", function(exports, require, module){
+module.exports = function(arr, obj){
+  if (arr.indexOf) return arr.indexOf(obj);
+  for (var i = 0; i < arr.length; ++i) {
+    if (arr[i] === obj) return i;
+  }
+  return -1;
+};
+});
+require.register("tower-emitter/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var index = require("component-indexof");
+var slice = [].slice;
+
+/**
+ * Expose `Emitter`.
+ */
+
+module.exports = Emitter;
+
+/**
+ * Initialize a new `Emitter`.
+ *
+ * @api public
+ */
+
+function Emitter(obj) {
+  if (obj) return mixin(obj);
+};
+
+/**
+ * Mixin the emitter properties.
+ *
+ * @param {Object} obj
+ * @return {Object}
+ * @api private
+ */
+
+function mixin(obj) {
+  for (var key in Emitter.prototype) {
+    obj[key] = Emitter.prototype[key];
+  }
+  return obj;
+}
+
+/**
+ * Listen on the given `event` with `fn`.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.on = function(event, fn){
+  this._callbacks || (this._callbacks = {});
+  (this._callbacks[event] || (this._callbacks[event] = []))
+    .push(fn);
+  return this;
+};
+
+/**
+ * Adds an `event` listener that will be invoked a single
+ * time then automatically removed.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.once = function(event, fn){
+  var self = this;
+  this._callbacks || (this._callbacks = {});
+
+  function on() {
+    self.off(event, on);
+    fn.apply(this, arguments);
+  }
+
+  fn._off = on;
+  this.on(event, on);
+  return this;
+};
+
+/**
+ * Remove the given callback for `event` or all
+ * registered callbacks.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.off =
+Emitter.prototype.removeListener =
+Emitter.prototype.removeAllListeners = function(event, fn){
+  if (!this._callbacks) return this;
+
+  // all
+  if (0 === arguments.length) {
+    this._callbacks = {};
+    return this;
+  }
+
+  // specific event
+  var callbacks = this._callbacks[event];
+  if (!callbacks) return this;
+
+  // remove all handlers
+  if (1 === arguments.length) {
+    delete this._callbacks[event];
+    return this;
+  }
+
+  // remove specific handler
+  var i = index(callbacks, fn._off || fn);
+  if (~i) callbacks.splice(i, 1);
+  return this;
+};
+
+/**
+ * Emit `event` with the given args.
+ *
+ * @param {String} event
+ * @param {Mixed} ...
+ * @return {Emitter}
+ */
+
+Emitter.prototype.emit = function(event){
+  if (!this._callbacks) return this;
+
+  this._callbacks || (this._callbacks || {});
+
+  var callbacks = this._callbacks[event];
+
+  if (callbacks) {
+    var args = slice.call(arguments, 1);
+    callbacks = callbacks.slice(0);
+    for (var i = 0, n = callbacks.length; i < n; ++i) {
+      callbacks[i].apply(this, args);
+    }
+  }
+
+  return this;
+};
+
+/**
+ * Return array of callbacks for `event`.
+ *
+ * @param {String} event
+ * @return {Array}
+ * @api public
+ */
+
+Emitter.prototype.listeners = function(event){
+  this._callbacks || (this._callbacks = {});
+  return this._callbacks[event] || [];
+};
+
+/**
+ * Check if this emitter has `event` handlers.
+ *
+ * @param {String} event
+ * @return {Boolean}
+ * @api public
+ */
+
+Emitter.prototype.hasListeners = function(event){
+  return !!this.listeners(event).length;
+};
+});
+require.register("tower-type/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var Emitter = require("tower-emitter");
+var validator = require("tower-validator");
+var types = require("./lib/types");
+
+/**
+ * Expose `type`.
+ */
+
+exports = module.exports = type;
+
+/**
+ * Expose `Type`.
+ */
+
+exports.Type = Type;
+
+/**
+ * Expose `collection`.
+ */
+
+exports.collection = [];
+
+/**
+ * Expose `validator`.
+ */
+
+exports.validator = validator.ns('type');
+
+/**
+ * Define or get a type.
+ *
+ * @param {String} name Type name.
+ * @param {Function} fn A function added to a list of sanitizers that sanitizes the type.
+ * @return {Type} A type instance.
+ * @api public
+ */
+
+function type(name, fn) {
+  if (undefined === fn && exports.collection[name])
+      return exports.collection[name];
+
+  var instance = new Type(name, fn);
+  exports.collection[name] = instance;
+  exports.collection.push(instance);
+  exports.emit('define', name, instance);
+  return instance;
+}
+
+/**
+ * Mixin `Emitter`.
+ */
+
+Emitter(exports);
+
+/**
+ * Check if validator exists.
+ *
+ * @param {String} name Type name.
+ * @return {Boolean} true if `Type` exists, else false.
+ * @api public
+ */
+
+exports.defined = function(name){
+  return exports.collection.hasOwnProperty(name);
+};
+
+/**
+ * Scope validators to a namespace.
+ *
+ * @param {String} ns A namespace
+ * @return {Function} A function that returns a namespaced exports object.
+ * @api public
+ */
+
+exports.ns = function(ns){
+  return function type(name, fn) {
+    return exports(ns + '.' + name, fn);
+  }
+};
+
+/**
+ * Remove all validators.
+ *
+ * @chainable
+ * @return {Function} exports The main `type` function.
+ * @api public
+ */
+
+exports.clear = function(){
+  var collection = exports.collection;
+
+  exports.off();
+  for (var key in collection) {
+    if (collection.hasOwnProperty(key)) {
+      delete collection[key];
+    }
+  }
+  collection.length = 0;
+  return exports;
+};
+
+/**
+ * Class representing a type.
+ *
+ * @class
+ * @param {String} name A type name.
+ * @param {Function} fn A function added to a list of sanitizers that sanitizes the type.
+ * @api public
+ */
+
+function Type(name, fn) {
+  // XXX: name or path? maybe both.
+  this.name = name;
+  // XXX: or maybe just delegate:
+  // this.validator = type.validator.ns(name);
+  // that might reduce memory quite a bit.
+  // even though it's still only a tiny bit of it.
+  this.validators = [];
+  // serialization/sanitization function.
+  if (fn) this.use(fn);
+}
+
+/**
+ * Add a validator function to a type.
+ *
+ * @chainable
+ * @param {String} name A validator name.
+ * @param {Function} fn A validator function.
+ * @returns {Type}.
+ * @api public
+ */
+
+Type.prototype.validator = function(name, fn){
+  // XXX: see above, this should probably just
+  // be happening in `validator.ns(this.name)`.
+  exports.validator(this.name + '.' + name, fn);
+  this.validators.push(this.validators[name] = fn);
+  return this;
+};
+
+/**
+ * Sanitize functions to pass value through.
+ *
+ * @chainable
+ * @param {Function} fn A sanitizor function.
+ * @return {Type}
+ * @api public
+ */
+
+Type.prototype.use = function(fn){
+  (this.sanitizers || (this.sanitizers = [])).push(fn);
+  return this;
+};
+
+/**
+ * Sanitize (or maybe `serialize`).
+ *
+ * XXX: maybe rename to `cast`?
+ *
+ * @param {Mixed} val A value to sanitize.
+ * @return {Mixed} The value sanitized.
+ * @api public
+ */
+
+Type.prototype.sanitize = function(val, obj){
+  if (!this.sanitizers) return val;
+
+  for (var i = 0, n = this.sanitizers.length; i < n; i++) {
+    val = this.sanitizers[i](val, obj);
+  }
+
+  return val;
+};
+
+/**
+ * Seralizer object by name.
+ *
+ * XXX: Maybe refactor into `tower/serializer` module.
+ *
+ * @chainable
+ * @param {String} name Object name.
+ * @return {Type}
+ * @api public
+ */
+
+Type.prototype.serializer = function(name){
+  this.context = (this.serializers || (this.serializers = {}))[name] = {};
+  return this;
+};
+
+/**
+ * Define how to serialize type from
+ * JavaScript to external API/service request format.
+ *
+ * XXX: to/out/request/serialize/format/use
+ *
+ * @chainable
+ * @param {Function} fn Function to handle serialization.
+ * @return {Type}
+ * @api public
+ */
+
+Type.prototype.to = function(fn){
+  // XXX: some way to set a default serializer.
+  if (!this.context) this.serializer('default');
+  this.context.to = fn;
+  return this;
+};
+
+/**
+ * Define how to deserialize type from 
+ * external API/service request format to JavaScript.
+ *
+ * XXX: from/in/response/deserialize
+ *
+ * @chainable
+ * @param {Function} fn Function to handle deserialization.
+ * @return {Type}
+ * @api public
+ */
+
+Type.prototype.from = function(fn){
+  if (!this.context) this.serializer('default');
+  this.context.from = fn;
+  return this;
+};
+
+/**
+ * Bring back to parent context.
+ *
+ * XXX: need more robust way to do this across modules.
+ *
+ * @param {String} name A type name.
+ */
+
+Type.prototype.type = function(name){
+
+};
+
+types(exports);
+});
+require.register("tower-type/lib/types.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var isArray = require("part-is-array");
+
+/**
+ * Expose `types`.
+ */
+
+module.exports = types;
+
+/**
+ * Define basic types and type validators.
+ *
+ * @param {Function} The type module.
+ */
+
+function types(type) {
+  // XXX: type('string').validator('lte')
+  // would default to `validator('gte')` if not explicitly defined.
+  type('string')
+    .use(String)
+    .validator('gte', function gte(a, b){
+      return a.length >= b.length;
+    })
+    .validator('gt', function gt(a, b){
+      return a.length > b.length;
+    });
+
+  type('id');
+
+  type('integer')
+    .use(parseInt);
+
+  type('object');
+
+  type('float')
+    .use(parseFloat);
+
+  type('decimal')
+    .use(parseFloat);
+
+  type('number')
+    .use(parseFloat);
+    
+  type('date')
+    .use(parseDate);
+
+  type('boolean')
+    .use(parseBoolean);
+
+  type('array')
+    // XXX: test? test('asdf') // true/false if is type.
+    // or `validate`
+    .use(function(val){
+      // XXX: handle more cases.
+      return isArray(val)
+        ? val
+        : val.split(/,\s*/);
+    })
+    .validator('lte', function lte(a, b){
+      return a.length <= b.length;
+    });
+
+  function parseDate(val) {
+    return isDate(val)
+      ? val
+      : new Date(val);
+  }
+
+  function parseBoolean(val) {
+    // XXX: can be made more robust
+    var kind = typeof(val);
+    switch (kind) {
+      case 'string':
+        return '1' === val;
+      case 'number':
+        return 1 === val;
+      default:
+        return !!val;
+    }
+  }
+}
+
+// XXX: refactor to `part`
+function isDate(val) {
+  return '[object Date]' === Object.prototype.toString.call(val);
+}
+});
+require.register("part-is-array/index.js", function(exports, require, module){
+
+/**
+ * Expose `isArray`.
+ */
+
+module.exports = Array.isArray || isArray;
+
+function isArray(obj) {
+  return '[object Array]' === toString.call(obj);
+}
+});
+require.register("tower-param/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var Emitter = require("tower-emitter");
+var validator = require("tower-validator");
+var type = require("tower-type");
+var isArray = require("part-is-array");
+var validators = require("./lib/validators");
+
+/**
+ * Expose `param`.
+ */
+
+exports = module.exports = param;
+
+/**
+ * Expose `Param`.
+ */
+
+exports.Param = Param;
+
+/**
+ * Expose `collection`.
+ */
+
+exports.collection = [];
+
+/**
+ * Expose `validator`.
+ */
+
+exports.validator = validator.ns('param');
+
+/**
+ * Get a `Param`.
+ */
+
+function param(name, type, options) {
+  if (exports.collection[name])
+    return exports.collection[name];
+
+  var instance = new Param(name, type, options);
+  exports.collection[name] = instance;
+  exports.collection.push(instance);
+  exports.emit('define', name, instance);
+  return instance;
+}
+
+/**
+ * Mixin `Emitter`.
+ */
+
+Emitter(exports);
+
+/**
+ * Instantiate a new `Param`.
+ */
+
+function Param(name, type, options){
+  if (!type) {
+    options = { type: 'string' };
+  } else if (isArray(type)) {
+    options = { type: 'array' };
+    options.itemType = type[0] || 'string';
+  } else if ('object' === typeof type) {
+    options = type;
+  } else {
+    options || (options = {});
+    options.type = type;
+  }
+
+  this.name = name;
+  this.type = options.type || 'string';
+
+  if (options.validators) this.validators = [];
+  if (options.alias) this.aliases = [ options.alias ];
+  else if (options.aliases) this.aliases = options.aliases;
+
+  // XXX: lazily create validators/operators?
+  // this.validators = options.validators || [];
+  // this.operators = options.operators || [];
+}
+
+/**
+ * Add validator to stack.
+ */
+
+Param.prototype.validator = function(key, val){
+  var assert = exports.validator(key);
+
+  (this.validators || (this.validators = []))
+    .push(function validate(self, query, constraint){ // XXX: fn callback later
+      if (!assert(self, constraint.right.value, val))
+        query.errors.push('Invalid Constraint something...');
+    });
+};
+
+/**
+ * Append operator to stack.
+ */
+
+Param.prototype.operator = function(name){
+  if (!this.operators) {  
+    this.operators = [];
+
+    var assert = validator('in');
+
+    (this.validators || (this.validators = []))
+      .push(function validate(self, query, constraint){
+        if (!assert(self, constraint.operator, self.operators)) {
+          query.errors.push('Invalid operator ' + constraint.operator);
+        } else {
+          // XXX: typecast
+        }
+      });
+  }
+
+  this.operators.push(name);
+};
+
+Param.prototype.validate = function(query, constraint, fn){
+  if (!this.validators) return true;
+
+  for (var i = 0, n = this.validators.length; i < n; i++) {
+    this.validators[i](this, query, constraint);
+  }
+
+  return !(query.errors && query.errors.length);
+};
+
+Param.prototype.alias = function(key){
+  (this.aliases || (this.aliases = [])).push(key);
+};
+
+// XXX: this might be too specific, trying it out for now.
+Param.prototype.format = function(type, name){
+  this.serializer = { type: type, name: name };
+};
+
+/**
+ * Convert a value into a proper form.
+ *
+ * Typecasting.
+ *
+ * @param {Mixed} val
+ */
+ 
+Param.prototype.typecast = function(val, fn){
+  // XXX: handle for whether or not it's a constraint or simple equality.
+  // XXX: handle async parsing too, in tower-type (for things like streams)
+  var res = type(this.type).sanitize(val);
+  if (fn) fn(null, res);
+  return res;
+};
+
+/**
+ * Expression for param.
+ */
+
+Param.prototype.expression = function(name){
+  this._expression = name;
+  return this;
+};
+
+validators(exports);
+});
+require.register("tower-param/lib/validators.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var validator = require("tower-validator");
+
+/**
+ * Expose `validators`.
+ */
+
+module.exports = validators;
+
+/**
+ * Define default validators.
+ */
+
+function validators(param) {
+  // XXX: todo
+  param.validator('present', function(self, obj){
+    return null != obj;
+  });
+
+	function define(key) {
+    param.validator(key, function(self, obj, val){
+      return validator(key)(obj, val);
+    });
+  }
+
+  define('eq');
+  define('neq');
+  define('in');
+  define('nin');
+  define('contains');
+  define('gte');
+  define('gt');
+  define('lt');
+  define('lte');
+  define('match');
+}
+});
+require.register("tower-stream/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var load = require("tower-load");
+var proto = require("./lib/proto");
+var statics = require("./lib/static");
+var api = require("./lib/api");
+
+/**
+ * Expose `stream`.
+ */
+
+exports = module.exports = stream;
+
+/**
+ * Find or create a stream by `name`.
+ *
+ * @param {String} name A stream name.
+ * @param {Function} fn Function called on stream execution.
+ * @api public
+ */
+
+function stream(name, fn) {
+  if (exports.collection[name]) return exports.collection[name];
+  if (exports.load(name)) return exports.collection[name];
+
+  /**
+   * Class representing a stream.
+   *
+   * @class
+   * @param {Object} options Stream options.
+   * @api public
+   */
+
+  function Stream(options) {
+    options || (options = {});
+
+    for (var key in options) this[key] = options[key];
+
+    this.name = name;
+    this.inputs = options.inputs || [];
+    this.outputs = options.outputs || [];
+    Stream.emit('init', this);
+  }
+
+  api.init(name, Stream, statics, proto, stream);
+
+  Stream.action = function(x, fn){
+    return stream(Stream.ns + '.' + x, fn);
+  }
+
+  if ('function' === typeof fn) Stream.on('exec', fn);
+
+  api.dispatch(stream, name, Stream);
+
+  return Stream;
+}
+
+/**
+ * Mixin API behavior.
+ */
+
+api(exports, statics, proto);
+
+/**
+ * Extend the `stream` API under a namespace.
+ *
+ * @param {String} ns A namespace.
+ * @return {Function} The `stream` API function extended under a namespace.
+ * @api public
+ */
+
+exports.ns = function(ns){
+  function stream(name, fn) {
+    return exports(ns + '.' + name, fn);
+  }
+
+  api.extend(stream, exports);
+
+  stream.exists = function(name){
+    return exports.exists(ns + '.' + name);
+  }
+
+  return stream;
+};
+
+/**
+ * Lazy-load.
+ * 
+ * @param {String} name A unique key such as a stream name.
+ * @param {Path} path Full `require.resolve(x)` path.
+ * @return {Function} A module.
+ * @api public
+ */
+
+exports.load = function(name, path){
+  return 1 === arguments.length
+    ? load(exports, name)
+    : load.apply(load, [exports].concat(Array.prototype.slice.call(arguments)));
+};
+
+/**
+ * Check if `stream` exists by `name`.
+ *
+ * @param {String} name A stream name.
+ * @return {Boolean} true if the stream exists, else false.
+ * @api public
+ */
+
+exports.exists = function(name){
+  // try lazy loading
+  if (undefined === exports.collection[name])
+    return !!exports.load(name);
+
+  return !!exports.collection[name];
+};
+});
+require.register("tower-stream/lib/static.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var Param = require("tower-param").Param;
+var Attr = require("tower-attr").Attr;
+
+/**
+ * Instantiate a new `Stream`.
+ *
+ * XXX: rename to `init`.
+ *
+ * @param {Object} options Stream options.
+ * @return {Stream} A `Stream` instance.
+ * @api public
+ */
+
+exports.create = function(options){
+  return new this(options);
+};
+exports.init = exports.create;
+
+/**
+ * Instantiate a new `Param`.
+ *
+ * @param {String} name Param name.
+ * @param {String} type Param type.
+ * @param {Object} options Param options.
+ * @return {Param} A `Param` instance.
+ * @api public.
+ */
+
+exports.param = function(name, type, options){
+  this.params || (this.params = []);
+  this.context = this.params[name] = new Param(name, type, options);
+  this.params.push(this.context);
+  return this;
+};
+
+/**
+ * Instantiate a new `Attr`.
+ *
+ * @param {String} name Attr name.
+ * @param {Type} type Attr type.
+ * @param {Object} options Attr options.
+ * @return {Attr} A `Attr` instance.
+ * @api public.
+ */
+
+exports.attr = function(name, type, options){
+  this.attrs || (this.attrs = []);
+  this.context = this.attrs[name] = new Attr(name, type, options);
+  this.attrs.push(this.context);
+  return this;
+};
+
+/**
+ * Add an alias.
+ *
+ * @param {String} name An alias name.
+ * @return {Object} The instance object.
+ */
+
+exports.alias = function(name){
+  this.context.alias(name);
+  return this;
+};
+
+/**
+ * Define a validator.
+ *
+ * @param {String} key Name of the operator for assertion.
+ * @param {Mixed} val
+ * @return {Object} The instance object.
+ */
+
+exports.validate = function(key, val){
+  if (this === this.context)
+    // key is a function
+    this.validator(key, val)
+  else
+    // param or attr
+    this.context.validator(key, val);
+
+  return this;
+};
+
+/**
+ * Append a validator function to the stack.
+ *
+ * @param {Function} fn A validator function.
+ * @return {Object} The instance object.
+ */
+
+exports.validator = function(fn){
+  // XXX: just a function in this case, but could handle more.
+  this.validators.push(fn);
+  return this;
+};
+
+/**
+ * Reset the `context` to `this`.
+ *
+ * @return {Object} The instance object.
+ */
+
+exports.self = function(){
+  return this.context = this;
+};
+});
+require.register("tower-stream/lib/proto.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var noop = function(){}; // XXX: temp until async emitter.
+
+/**
+ * Execute the stream.
+ * 
+ * @param {Object} data The stream data.
+ * @param {Function} fn Function called on executing stream.
+ */
+
+exports.exec = function(data, fn){
+  this.constructor.emit('exec', this, data, fn || noop);
+  // XXX: need to handle with/without cases.
+  //if (fn) fn();
+};
+
+/**
+ * Open the stream.
+ *
+ * @param {Object} data The stream data.
+ * @param {Function} fn Function called on opening stream.
+ */
+
+exports.open = function(data, fn){
+  // XXX: refactor
+  if (this.constructor.hasListeners('open'))
+    this.constructor.emit('open', this, data, fn || noop);
+  if (this.hasListeners('open'))
+    this.emit('open', fn || noop);
+
+  if (!this.hasListeners('open') && !this.constructor.hasListeners('open'))
+    fn();
+};
+
+/**
+ * Close the stream.
+ *
+ * @param {Function} fn Function called on closing stream.
+ */
+
+exports.close = function(fn){
+  this.constructor.emit('close', this, fn);
+  this.emit('close', fn);
+};
+});
+require.register("tower-stream/lib/api.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var Emitter = require("tower-emitter");
+
+/**
+ * Expose `constructorFn`
+ */
+
+exports = module.exports = api;
+
+/**
+ * Setup the DSL API for a library.
+ *
+ * This is called once per "apiFn method".
+ *
+ * @param {Function} apiFn An api.
+ * @param {Function} statics Module containing static functions to attach to `apiFn`.
+ * @param {Function} proto Module containing instance functions to attach to `apiFn`.
+ * @return {Function} The api `apiFn`.
+ */
+
+function api(apiFn, statics, proto){
+  apiFn.collection = [];
+
+  // mixin `Emitter`
+
+  Emitter(apiFn);
+  Emitter(statics);
+  Emitter(proto);
+
+  apiFn.clear = clear;//clear.bind(apiFn);
+  apiFn.remove = remove;//remove.bind(apiFn);
+
+  return apiFn;
+}
+
+/**
+ * Add base behavior to a `Function`.
+ *
+ * This is called inside the API method.
+ *
+ * @param {String} name `fn` id.
+ * @param {Function} fn A function.
+ * @param {Function} statics Module containing static functions to attach to `fn`.
+ * @param {Function} proto Module containing instance functions to attach to `fn`.
+ * @param {Function} apiFn An api.
+ * @return {Function} The api `apiFn`.
+ */
+
+exports.init = function(name, fn, statics, proto, apiFn){
+  fn.id = name;
+
+  // namespace
+
+  fn.ns = name.replace(/\.\w+$/, '');
+
+  // statics
+
+  for (var key in statics) fn[key] = statics[key];
+
+  // prototype
+
+  fn.prototype = {};
+  fn.prototype.constructor = fn;
+  
+  for (var key in proto) fn.prototype[key] = proto[key];
+
+  apiFn.collection[name] = fn;
+  apiFn.collection.push(fn);
+
+  return apiFn;
+};
+
+/**
+ * Emit events for the `name`,
+ * so that external libraries can add extensions.
+ *
+ * @param {Function} apiFn An api.
+ * @param {String} name A name.
+ * @param {Function} fn Function called on `apiFn` define event.
+ * @return {Function} The api `apiFn`.
+ */
+
+exports.dispatch = function(apiFn, name, fn){
+  var parts = name.split('.');
+
+  for (var i = 1, n = parts.length + 1; i < n; i++) {
+    apiFn.emit('define ' + parts.slice(0, i).join('.'), fn);
+  }
+
+  apiFn.emit('define', fn);
+
+  return apiFn;
+};
+
+/**
+ * Scope the `constructorFn` names under a namespace.
+ *
+ * @param {Function} childApi The api to copy functions to.
+ * @param {Function} parentApi The api to copy functions from.
+ * @return {Function} The api `childApi`.
+ */
+
+exports.extend = function(childApi, parentApi){
+  // XXX: copy functions?
+  for (var key in parentApi) {
+    if ('function' === typeof parentApi[key])
+      childApi[key] = parentApi[key];
+  }
+  return childApi;
+};
+
+/**
+ * Clear API behavior.
+ */
+
+function clear(){
+  // remove all listeners
+  this.off();
+
+  while (this.collection.length)
+    this.remove(this.collection.pop());
+
+  return this;
+}
+
+function remove(val, i){
+  var emitter = this.collection[val] || val;
+  emitter.off();
+  delete this.collection[emitter.id];
+  // XXX: delete from collection array.
+}
+});
+require.register("part-is-blank/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+module.exports = function isBlank(obj){
+  if (null == obj || '' === obj) return true;
+  if (obj.length) return !obj.length;
+  if ('object' === typeof obj) {
+    for (var key in obj) return false;
+    return true;
+  }
+  return false;
+};
+});
+require.register("component-type/index.js", function(exports, require, module){
+/**
+ * toString ref.
+ */
+
+var toString = Object.prototype.toString;
+
+/**
+ * Return the type of `val`.
+ *
+ * @param {Mixed} val
+ * @return {String}
+ * @api public
+ */
+
+module.exports = function(val){
+  switch (toString.call(val)) {
+    case '[object Date]': return 'date';
+    case '[object RegExp]': return 'regexp';
+    case '[object Arguments]': return 'arguments';
+    case '[object Array]': return 'array';
+    case '[object Error]': return 'error';
+  }
+
+  if (val === null) return 'null';
+  if (val === undefined) return 'undefined';
+  if (val !== val) return 'nan';
+  if (val && val.nodeType === 1) return 'element';
+
+  return typeof val.valueOf();
+};
+
+});
+require.register("tower-attr/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var validator = require("tower-validator").ns('attr');
+var types = require("tower-type");
+var kindof = 'undefined' === typeof window ? require("type-component") : require("tower-type");
+var each = require("part-async-series");
+var isBlank = require("part-is-blank");
+var validators = require("./lib/validators");
+
+/**
+ * Expose `attr`.
+ */
+
+exports = module.exports = attr;
+
+/**
+ * Expose `Attr`.
+ */
+
+exports.Attr = Attr;
+
+/**
+ * Expose `validator`.
+ */
+
+exports.validator = validator;
+
+/**
+ * Get an `Attr` instance.
+ */
+
+function attr(name, type, options, path) {
+  return new Attr(name, type, options, path);
+}
+
+/**
+ * Instantiate a new `Attr`.
+ */
+
+function Attr(name, type, options, path){
+  if (undefined === type) {
+    // .attr('title')
+    options = { type: 'string' };
+  } else {
+    var kind = kindof(type);
+
+    if ('object' === kind) {
+      // .attr('title', { value: 'Hello World', type: 'string' })
+      options = type;
+    } else if ('function' === kind) {
+      // .attr('title', function(){})
+      options = { value: type };
+      // XXX: array too
+    } else if ('array' === kind) {
+      options = { type: 'array', value: type };
+    } else {
+      if ('object' !== kindof(options)) {
+        options = { value: options };
+      } else {
+        options || (options = {});
+      }
+
+      // if `type` isn't in the list,
+      // it's a default value.
+      if (undefined !== options.value || types.defined(type))
+        options.type = type;
+      else
+        options.value = type;
+    }
+  }
+
+  this.name = name;
+  this.path = path || 'attr.' + name;
+
+  for (var key in options) this[key] = options[key];
+  if (!this.type) this.type = 'string';
+  
+  // override `.apply` for complex types
+  this.valueType = kindof(this.value);
+
+  switch (this.valueType) {
+    case 'function':
+      this.apply = functionType;
+      break;
+    case 'array':
+      this.apply = arrayType;
+      break;
+    case 'date':
+      this.apply = dateType;
+      break;
+  }
+}
+
+/**
+ * Add validator to stack.
+ */
+
+Attr.prototype.validator = function(key, val){
+  var self = this;
+  var assert = validator(key);
+  this.validators || (this.validators = []);
+  var validate;
+
+  if (4 === assert.length) {
+    validate = function(obj, errors, fn){
+      assert(self, obj, val, function(err){
+        if (err) errors[key] = false;
+      });
+    };
+  } else {
+    validate = function(obj, errors, fn){
+      if (!assert(self, obj, val))
+        errors[key] = false;
+      fn();
+    }
+  }
+
+  this.validators.push(validate);
+};
+
+Attr.prototype.alias = function(key){
+  (this.aliases || (this.aliases = [])).push(key);
+};
+
+Attr.prototype.validate = function(data, errors, fn){
+  if (!this.validators) return fn();
+
+  var validators = this.validators;
+  var i = 0;
+  var validator;
+  
+  function next() {
+    validator = validators[i++];
+    if (validator) {
+      validator(data, errors, next); 
+    } else {
+      if (isBlank(errors))
+        fn();
+      else
+        fn(errors);
+    }
+  }
+
+  next();
+
+  return errors;
+};
+
+/**
+ * Convert a value into a proper form.
+ *
+ * Typecasting.
+ *
+ * @param {Mixed} val
+ * @param {Mixed} obj The object instance this attr value is relative to.
+ */
+
+Attr.prototype.typecast = function(val, obj){
+  return types(this.type).sanitize(val, obj);
+};
+
+/**
+ * Get default value.
+ *
+ * @param {Mixed} obj the object/record/instance to use
+ *    in computing the default value (if it's a function).
+ */
+
+Attr.prototype.apply = function(obj){
+  return this.value;
+};
+
+/**
+ * Types for applying default values.
+ */
+
+function functionType(obj, val) {
+  return this.value(obj, val);
+}
+
+function arrayType(obj) {
+  return this.value.concat();
+}
+
+function dateType(obj) {
+  return new Date(this.value.getTime());
+}
+
+/**
+ * Define basic validators.
+ */
+
+validators(exports);
+});
+require.register("tower-attr/lib/validators.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var validator = require("tower-validator");
+
+/**
+ * Expose `validators`.
+ */
+
+module.exports = validators;
+
+/**
+ * Define default validators.
+ */
+
+function validators(attr) {
+  // XXX: maybe this goes into a separate module.
+  attr.validator('present', function(self, obj){
+    return null != obj[self.name];
+  });
+
+  function define(key) {
+    attr.validator(key, function(self, obj, val){
+      return validator(key)(obj[self.name], val);
+    });
+  }
+
+  define('eq');
+  define('neq');
+  define('in');
+  define('nin');
+  define('contains');
+  define('gte');
+  define('gt');
+  define('lt');
+  define('lte');
+
+  validator('string.gte', function(a, b){
+    return a.length >= b;
+  });
+
+  validator('string.lte', function(a, b){
+    return a.length <= b;
+  });
+
+  define('string.gte');
+  define('string.lte');
+
+  attr.validator('min', attr.validator('string.gte'));
+  attr.validator('max', attr.validator('string.lte'));
+}
+});
+require.register("tower-validator/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var Emitter = require("tower-emitter");
+var validators = require("./lib/validators");
+
+/**
+ * Expose `validator`.
+ */
+
+exports = module.exports = validator;
+
+/**
+ * All validators in the order they were defined.
+ */
+
+exports.collection = [];
+
+/**
+ * Get or set a validator function.
+ *
+ * @param {String} name Validator name.
+ * @param {Function} fn Validator function.
+ * @return {Function} Validator function.
+ * @api public
+ */
+
+function validator(name, fn) {
+  if (undefined === fn) return exports.collection[name];
+
+  exports.collection[name] = fn;
+  exports.collection.push(fn);
+  exports.emit('define', name, fn);
+  
+  return fn;
+}
+
+/**
+ * Mixin `Emitter`.
+ */
+
+Emitter(exports);
+
+/**
+ * Check if validator exists.
+ *
+ * @param {String} name Validator name.
+ * @return {Boolean} true if the validator exists in the current list of validators, else false.
+ * @api public
+ */
+
+exports.defined = function(name){
+  return exports.collection.hasOwnProperty(name);
+};
+
+/**
+ * Scope validators to a namespace.
+ *
+ * @param {String} ns A namespace.
+ * @return {Function} Function to get or set a validator under a namespace.
+ * @api public
+ */
+
+exports.ns = function(ns){
+  return function validator(name, fn) {
+    return exports(ns + '.' + name, fn);
+  }
+};
+
+/**
+ * Remove all validators.
+ *
+ * @chainable
+ * @return {Function} exports The main `validator` function.
+ * @api public
+ */
+
+exports.clear = function(){
+  var collection = exports.collection;
+
+  exports.off('define');
+  for (var key in collection) {
+    if (collection.hasOwnProperty(key)) {
+      delete collection[key];
+    }
+  }
+  collection.length = 0;
+  return exports;
+};
+
+validators(exports);
+});
+require.register("tower-validator/lib/validators.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var indexof = require("component-indexof");
+
+/**
+ * Expose `validators`.
+ */
+
+module.exports = validators;
+
+/**
+ * Define basic operators/validators.
+ *
+ * @param {Function} The validator module.
+ */
+
+function validators(validator) {
+  validator('eq', function eq(a, b){
+    return a === b;
+  });
+
+  validator('neq', function neq(a, b){
+    return a !== b;
+  });
+
+  validator('contains', function contains(a, b){
+    return !!~indexof(b, a);
+  });
+
+  validator('in', validator('contains'));
+
+  validator('excludes', function nin(a, b){
+    return !~indexof(b, a);
+  });
+
+  validator('nin', validator('excludes'));
+
+  validator('gte', function gte(a, b){
+    return a >= b;
+  });
+
+  validator('gt', function gt(a, b){
+    return a > b;
+  });
+
+  validator('lte', function gte(a, b){
+    return a <= b;
+  });
+
+  validator('lt', function gt(a, b){
+    return a < b;
+  });
+
+  validator('match', function match(a, b){
+    return !!a.match(b);
+  });
+}
+});
+require.register("tower-text/index.js", function(exports, require, module){
+
+/**
+ * DSL context.
+ */
+
+var context;
+
+/**
+ * Current language.
+ */
+
+var locale;
+
+/**
+ * Expose `text`.
+ */
+
+exports = module.exports = text;
+
+/**
+ * Example:
+ *
+ *    text('messages')
+ *
+ * @param {String} key
+ * @api public
+ */
+
+function text(key, val) {
+  return undefined === val
+    ? (locale[key] || (locale[key] = new Text))
+    : (locale[key] = new Text).one(val);
+}
+
+exports.has = function(key){
+  return !!locale[key];
+};
+
+/**
+ * Set locale.
+ */
+
+exports.locale = function(val){
+  locale = exports[val] || (exports[val] = {});
+  return exports;
+};
+
+/**
+ * Default locale is `en`.
+ */
+
+exports.locale('en');
+
+/**
+ * Instantiate a new `Text`.
+ *
+ * @api private
+ */
+
+function Text() {
+  this.inflections = [];
+}
+
+/**
+ * @param {String} string
+ * @api public
+ */
+
+Text.prototype.past = function(string){
+  return this.inflection(string, context.count, 'past');
+};
+
+/**
+ * @param {String} string
+ * @api public
+ */
+
+Text.prototype.present = function(string){
+  return this.inflection(string, context.count, 'present');
+};
+
+/**
+ * @param {String} string
+ * @api public
+ */
+
+Text.prototype.future = function(string){
+  return this.inflection(string, context.count, 'future');
+};
+
+/**
+ * @param {String} string
+ * @param {String} tense
+ * @param {String} count
+ * @api public
+ */
+
+Text.prototype.tense = function(string, tense, count){
+  return this.inflection(string, count, tense);
+};
+
+/**
+ * @param {String} string
+ * @api public
+ */
+
+Text.prototype.none = function(string){
+  return this.inflection(string, 'none');
+};
+
+/**
+ * @param {String} string
+ * @api public
+ */
+
+Text.prototype.one = function(string){
+  return this.inflection(string, 'one');
+};
+
+/**
+ * @param {String} string
+ * @api public
+ */
+
+Text.prototype.other = function(string){
+  return this.inflection(string, 'other');
+};
+
+/**
+ * @param {String} string
+ * @param {String} count
+ * @param {String} tense
+ * @api public
+ */
+
+Text.prototype.inflection = function(string, count, tense){
+  // this isn't quite correct...
+  this.inflections.push(context = {
+    string: string,
+    count: count == null ? 'all' : count,
+    tense: tense || 'present'
+  });
+
+  return this;
+};
+
+/**
+ * This could be a view on the client.
+ *
+ * @param {Object} options
+ * @api public
+ */
+
+Text.prototype.render = function(options){
+  options || (options = {});
+
+  var count = (options.count ? (1 === options.count ? 'one' : 'other') : 'none')
+    , tense = options.tense || 'present'
+    , key = tense + '.' + count
+    , inflections = this.inflections
+    , inflection = inflections[0]
+    , currScore = 0
+    , prevScore = 0;
+
+  for (var i = 0, n = inflections.length; i < n; i++) {
+    currScore = 0
+      + (count === inflections[i].count ? 1 : 0)
+      + (tense === inflections[i].tense ? 1 : 0);
+
+    if (currScore > prevScore) {
+      inflection = inflections[i];
+      prevScore = currScore; 
+    }
+  }
+
+  return inflection.string.replace(/\{\{(\w+)\}\}/g, function(_, $1){
+    return options[$1];
+  });
+};
+});
+require.register("tower-load/index.js", function(exports, require, module){
+
+/**
+ * Expose `load`.
+ */
+
+exports = module.exports = load;
+
+/**
+ * Map of `api + '.' + key` to absolute module path.
+ */
+
+exports.paths = {};
+
+/**
+ * Map of path to array of `api + '.' + key`.
+ */
+
+exports.keys = {};
+
+/**
+ * Map of path to `fn`.
+ */
+
+exports.fns = {};
+
+/**
+ * Lazy-load a module.
+ *
+ * This is something like an IoC container.
+ * Make sure the `api.toString()` is unique.
+ *
+ * @param {Function} api An api.
+ * @param {String} key A unique key.
+ * @param {Path} path Full `require.resolve(x)` path.
+ * @return {Function} A module.
+ * @api public
+ */
+
+function load(api, key, path) {
+  return undefined === path
+    ? exports.get(api, key)
+    : exports.set.apply(exports, arguments);
+}
+
+/**
+ * Get a module.
+ *
+ * @param {Function} api An api.
+ * @param {String} key A unique key
+ * @return {Function} A module.
+ * @api public
+ */
+
+exports.get = function(api, key){
+  var path = exports.paths[api.name + '.' + key];
+  if (path) {
+    var fn = exports.fns[path];
+    if (fn) return fn();
+  }
+}
+
+/**
+ * Define how to lazy-load a module.
+ *
+ * @chainable
+ * @param {Function} api An api.
+ * @param {String} key A unique key.
+ * @param {Path} path Full `require.resolve(x)` path.
+ * @return {Function} exports The main `load` function.
+ * @api public
+ */
+
+exports.set = function(api, key, path){
+  var pathKey = api.name + '.' + key;
+  if (!exports.paths[pathKey]) {
+    exports.paths[pathKey] = path;
+    (exports.keys[path] || (exports.keys[path] = [])).push(pathKey);
+    if (!exports.fns[path]) {
+      exports.fns[path] = requireFn(path, Array.prototype.slice.call(arguments, 3));
+    }
+  }
+  return exports;
+};
+
+/**
+ * Clear all modules.
+ *
+ * @param {Path} path Full `require.resolve(x)` path.
+ * @api public
+ */
+
+exports.clear = function(path){
+  for (var i = 0, n = exports.keys[path].length; i < n; i++) {
+    delete exports.paths[exports.keys[path][i]];
+  }
+  exports.keys[path].length = 0;
+  delete exports.keys[path];
+  delete exports.fns[path];
+};
+
+/**
+ * Return module function results.
+ *
+ * @param {Path} path Full `require.resolve(x)` path.
+ * @param {Array} args Module function arguments array.
+ * @return {Mixed} Module function return value.
+ */
+
+function requireFn(path, args) {
+  return function(obj) {
+    // remove all listeners
+    exports.clear(path);
+
+    var result = require(path);
+
+    if ('function' === typeof result) {
+      //args.unshift(obj);
+      result.apply(result, args);
+    }
+    
+    args = undefined;
+    return result;
+  }
+}
+});
+require.register("part-async-series/index.js", function(exports, require, module){
+module.exports = function(fns, val, done, binding){
+  var i = 0, fn;
+
+  function handle(err) {
+    if (err) return done(err);
+    next();
+  }
+
+  function next() {
+    if (fn = fns[i++]) {
+      if (2 === fn.length) {
+        fn.call(binding, val, handle);
+      } else {
+        if (false === fn.call(binding, val))
+          done(new Error('haulted'));
+        else
+          next();
+      }
+    } else {
+      if (done) done();
+    }
+  }
+
+  next();
+}
+});
+require.register("tower-resource/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var Emitter = require("tower-emitter");
+var stream = require("tower-stream");
+var validator = require("tower-validator").ns('resource');
+var load = require("tower-load");
+var proto = require("./lib/proto");
+var statics = require("./lib/static");
+var slice = [].slice;
+
+/**
+ * Expose `resource`.
+ */
+
+exports = module.exports = resource;
+
+/**
+ * Expose `collection`
+ */
+
+exports.collection = [];
+
+/**
+ * Expose `validator`.
+ */
+
+exports.validator = validator;
+
+/**
+ * Create a new resource constructor with the given `name`.
+ *
+ * @param {String} name Resource name.
+ * @return {Function} The `Resource` class constructor.
+ * @api public
+ */
+
+function resource(name) {
+  if (exports.collection[name]) return exports.collection[name];
+  if (exports.load(name)) return exports.collection[name];
+
+  /**
+   * Initialize a new resource with the given `attrs`.
+   *
+   * @class
+   * @param {Object} attrs An object with attributes.
+   * @param {Boolean} storedAttrs Attributes that should not be dirtied.
+   * @api public
+   */
+
+  function Resource(attrs, storedAttrs) {
+    // XXX: if storedAttrs, don't set to dirty
+    this.attrs = {};
+    this.dirty = {};
+    this._callbacks = {};
+    attrs = Resource._defaultAttrs(attrs, this);
+
+    for (var key in attrs) {
+      if (attrs.hasOwnProperty(key))
+        this.set(key, attrs[key], true);
+    }
+
+    Resource.emit('init', this);
+  }
+
+  Resource.toString = function toString(){
+    return 'resource("' + name + '")';
+  }
+
+  // statics
+
+  Resource.className = name;
+  Resource.id = name;
+  Resource.attrs = [];
+  // optimization
+  Resource.attrs.__default__ = {};
+  Resource.validators = [];
+  Resource.prototypes = [];
+  Resource.relations = [];
+  Resource._callbacks = {};
+  // starting off context
+  Resource.context = Resource;
+
+  for (var key in statics) Resource[key] = statics[key];
+
+  // prototype
+
+  Resource.prototype = {};
+  Resource.prototype.constructor = Resource;
+  
+  for (var key in proto) Resource.prototype[key] = proto[key];
+
+  Resource.action = stream.ns(name);
+  Resource.id();
+
+  exports.collection[name] = Resource;
+  exports.collection.push(Resource);
+  exports.emit('define', Resource);
+  exports.emit('define ' + name, Resource);
+
+  return Resource;
+}
+
+/**
+ * Mixin `Emitter`.
+ */
+
+Emitter(resource);
+Emitter(statics);
+Emitter(proto);
+
+/**
+ * Mixins.
+ */
+
+exports.use = function(obj){
+  if ('function' === typeof obj) {
+    obj.call(exports, statics, proto, exports);
+  } else {
+    for (var key in obj) statics[key] = obj[key]
+  }
+};
+
+/**
+ * Lazy-load stuff for a particular constructor.
+ *
+ * Example:
+ *
+ *    resource.load('user', require.resolve('./lib/user'));
+ *
+ * @param {String} name Resource name.
+ * @param {String} path Resource path.
+ * @api public
+ */
+
+exports.load = function(name, path){
+  return 1 === arguments.length
+    ? load(exports, name)
+    : load.apply(load, [exports].concat(Array.prototype.slice.call(arguments)));
+};
+
+/**
+ * Create a `resource` function that
+ * just prepends a namespace to every key.
+ *
+ * This is used to make the DSL simpler,
+ * check out the `tower-adapter` code for an example.
+ *
+ * @param {String} ns The namespace.
+ * @return {Resource} The resource.
+ * @api public
+ */
+
+exports.ns = function(ns){
+  function resource(name) {
+    return exports(ns + '.' + name);
+  }
+
+  // XXX: copy functions?
+  for (var key in exports) {
+    if ('function' === typeof exports[key])
+      resource[key] = exports[key];
+  }
+  return resource;
+};
+
+/**
+ * Check object is a `Resource` object.
+ * XXX: maybe remove "resource('name')" as toString.
+ *
+ * @param {Object} obj A JavaScript object.
+ * @return {Boolean} true if obj is a `Resource` object, otherwise false.
+ * @api public
+ */
+
+exports.is = function(obj){
+  return obj && obj.constructor.toString().indexOf('resource(') === 0;
+};
+
+/**
+ * Clear resources.
+ *
+ * @return {Function} exports The main `resource` function.
+ * @api public
+ */
+
+exports.clear = function(){
+  exports.collection.forEach(function(emitter){
+    emitter.off('define');
+    delete exports.collection[emitter.className];
+  });
+
+  exports.collection.length = 0;
+
+  return exports;
+};
+});
+require.register("tower-resource/lib/static.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var attr = require("tower-attr");
+var validator = require("tower-validator").ns('resource');
+var text = require("tower-text"); // XXX: rename `tower-text`?
+var query = require("tower-query");
+var series = require("part-async-series");
+
+text('resource.error', 'Resource validation failed');
+
+/**
+ * Instantiate a new `Resource`.
+ *
+ * @constructor Resource
+ * @param {Object} attrs Resource attributes.
+ * @param {Boolean} storedAttrs Boolean to enable caching attributes.
+ * @return {Object} instance.
+ */
+
+exports.init = function(attrs, storedAttrs){
+  return new this(attrs, storedAttrs);
+};
+
+/**
+ * Check if this resource is new.
+ *
+ * @constructor Resource
+ * @param {Object} data The attributes to test.
+ * @return {Boolean} true if resource is new, else false.
+ * @api public
+ */
+
+exports.isNew = function(data){
+  return !has(data, this.primaryKey);
+};
+
+/**
+ * Use the given plugin `fn()`.
+ *
+ * @constructor Resource
+ * @chainable
+ * @param {Function} fn Plugin function.
+ * @return {Function} exports The main `resource` function.
+ * @api public
+ */
+
+exports.use = function(fn){
+  fn(this);
+  return this;
+};
+
+/**
+ * Add validation `fn()`.
+ *
+ * @constructor Resource
+ * @chainable
+ * @param {Function} fn Validation function.
+ * @return {Function} exports The main `resource` function.
+ * @api public
+ */
+
+exports.validate = function(key, val){
+  // XXX: add validator to validate attributes.
+  if (!this.validators.attrs && this !== this.context) {
+    var self = this;
+    this.validators.attrs = true;
+    this.validator(function validateAttributes(obj, fn){
+      var validators = [];
+
+      self.attrs.forEach(function(attr){
+        if (attr.validators && attr.validators.length) {
+          validators.push(function validate(obj){
+            attr.validate(obj);
+          });
+        }
+      });
+
+      series(validators, obj, fn);
+    });
+  }
+  
+  if ('function' === typeof key)
+    this.validator(key);
+  else
+    this.context.validator(key, val);
+
+  return this;
+};
+
+/**
+ * Add a validation function to a list of validators.
+ *
+ * @constructor Resource
+ * @chainable
+ * @param key Resource property.
+ * @param val Resource property value.
+ * @return {Function} exports The main `resource` function.
+ * @api public
+ */
+
+exports.validator = function(key, val){
+  if ('function' === typeof key) {
+    // XXX: needs to handle pushing errors.
+    this.validators.push(key);
+  } else {
+    var assert = validator(key);
+    // XXX: should be set somewhere earlier.
+    var path = this.path || 'resource.' + this.className + '.' + key;
+
+    this.validators.push(function validate(obj, fn){
+      if (!assert(obj, val)) {
+        // XXX: hook into `tower-text` for I18n
+        var error = text.has(path)
+          ? text(path).render(obj)
+          : text('resource.error').render(obj);
+
+        obj.errors[attr.name] = error;
+        obj.errors.push(error);
+      }
+    });
+  }
+  return this;
+};
+
+/**
+ * Define an `id`.
+ *
+ * @constructor Resource
+ * @chainable
+ * @param {String} name
+ * @param {Object} options
+ * @return {Function} exports The main `resource` function.
+ * @api public
+ */
+
+exports.id = function(name, type, options){
+  options || (options = {});
+  return this.attr(name || 'id', type || 'id', options);
+};
+
+/**
+ * Define attr with the given `name` and `options`.
+ *
+ * @constructor Resource
+ * @chainable
+ * @param {String} name
+ * @param {Object} options
+ * @return {Function} exports The main `resource` function.
+ * @api public
+ */
+
+exports.attr = function(name, type, options){
+  var obj = this.context = attr(name, type, options, this.id + '.' + name);
+
+  // set?
+  this.attrs[name] = obj;
+  this.attrs.push(obj);
+  // optimization
+  if (obj.hasDefaultValue) this.attrs.__default__[name] = obj;
+
+  // implied pk
+  if ('id' === name) {
+    options.primaryKey = true;
+    this.primaryKey = name;
+  }
+
+  return this;
+};
+
+/**
+ * Insert/POST/create a new record.
+ *
+ * @constructor Resource
+ * @param {Object} attrs Initial record attribute values.
+ * @param {Function} fn Function called on record creation.
+ * @return {Topology} A stream object.
+ * @api public
+ */
+
+exports.create = function(attrs, fn){
+  if ('function' === typeof attrs) {
+    fn = attrs;
+    attrs = undefined;
+  }
+  return this.init(attrs).save(fn);
+};
+
+/**
+ * Save/PUT/update an existing record.
+ *
+ * @constructor Resource
+ * @param {Object} attrs Record attribute values to be updated to.
+ * @param {Function} fn Function called on record update.
+ * @return {Topology} A stream object.
+ * @api public
+ */
+
+exports.save = function(attrs, fn){
+  if ('function' === typeof attrs) {
+    fn = attrs;
+    attrs = undefined;
+  }
+  return this.init(attrs).save(fn);
+};
+
+/**
+ * Make a SELECT query on className and name.
+ *
+ * @param {String} name An appended namespace.
+ * @return {Query} Query object containing query results.
+ * @api public
+ */
+
+exports.query = function(name){
+  return null == name
+    ? query().select(this.className)
+    // XXX: this should only happen first time.
+    : query(this.className + '.' + name).select(this.className);
+};
+
+/**
+ * Execute find query with `fn`.
+ *
+ * @constructor Resource
+ * @param {Function} fn Function executed on query `find` call.
+ * @return {Query} Query object containing query results.
+ */
+
+exports.find = function(fn){
+  return this.query().find(fn);
+};
+
+/**
+ * Remove all records of this type.
+ *
+ * @constructor Resource
+ * @param {Function} fn Function executed on query `remove` call.
+ * @return {Query} Query object containing query results.
+ * @api public
+ */
+
+exports.remove = function(fn){
+  return this.query().remove(fn);
+};
+
+/**
+ * Updates a list of records.
+ *
+ * @constructor Resource
+ * @param {Array} updates List of record attributes to update.
+ * @param {Function} fn Function executed on record update.
+ * @api public
+ */
+
+exports.update = function(updates, fn){
+  return this.query().update(updates, fn);
+};
+
+/**
+ * Begin defining a query.
+ *
+ * @constructor Resource
+ * @param {String} key Attribute path
+ * @return {Query} Query object.
+ * @api public
+ */
+
+exports.where = function(key){
+  return this.query().where(key);
+};
+
+/**
+ * Get all records.
+ *
+ * @constructor Resource
+ * @param {Function} fn Function executed on query `all` call.
+ * @return {Query} Query object containing query results.
+ */
+
+exports.all = function(fn){
+  return this.query().all(fn);
+};
+
+/**
+ * XXX: Load data into store.
+ *
+ * @constructor Resource
+ * @param {Object} Data to load into store.
+ */
+
+exports.load = function(data){
+  // XXX require("tower-memory-adapter").load(data);
+};
+
+/**
+ * Returns the default model attributes with their values.
+ *
+ * @constructor Resource
+ * @return {Object} The default model attributes with their values.
+ * @api private
+ */
+
+exports._defaultAttrs = function(attrs, binding){
+  // XXX: this can be optimized further.
+  var defaultAttrs = this.attrs.__default__;
+  attrs || (attrs = {});
+  for (var name in defaultAttrs) {
+    if (undefined === attrs[name])
+      attrs[name] = defaultAttrs[name].apply(binding);
+  }
+  return attrs;
+};
+});
+require.register("tower-resource/lib/proto.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var query = require("tower-query");
+var each = require("part-async-series");
+
+/**
+ * Save and invoke `fn(err)`.
+ *
+ * Events:
+ *
+ *  - `save` on updates and saves
+ *  - `saving` pre-update or save, after validation
+ *
+ * @constructor Resource
+ * @param {Function} fn Function invoked on resource creation.
+ * @api public
+ */
+
+exports.save = function(fn){
+  var self = this;
+  this.constructor.emit('saving', this);
+  this.emit('saving');
+  // XXX: needs to somehow set default properties
+  // XXX: this itself should probably be
+  //      bundled into a topology/stream/action.
+  this.validate(function(err){
+    if (err) {
+      fn(err);
+    } else {
+      query()
+        .select(self.constructor.className)
+        .create(self, function(){
+          self.dirty = {};
+          self.constructor.emit('save', self);
+          self.emit('save');
+          if (fn) fn(null, self);
+        });
+    }
+  });
+};
+
+/**
+ * Update and invoke `fn(err)`.
+ *
+ * @constructor Resource
+ * @param {Function} fn Function executed on resource update.
+ * @return {Mixed} fn return value.
+ * @api private
+ */
+
+exports.update = function(fn){
+  return query()
+    .select(this.constructor.className)
+    .action('update', this).exec(fn);
+};
+
+/**
+ * Remove the resource and mark it as `.removed`
+ * and invoke `fn(err)`.
+ *
+ * Events:
+ *
+ *  - `removing` before deletion
+ *  - `remove` on deletion
+ *
+ * @constructor Resource
+ * @param {Function} fn Function executed on resource removal.
+ * @return {Mixed} fn return value.
+ * @api public
+ */
+
+exports.remove = function(fn){
+  return query()
+    .select(this.constructor.className)
+    .where('id').eq(this.get('id'))
+    .action('remove').exec(fn);
+};
+
+/**
+ * Validate the resource and return a boolean.
+ *
+ * @constructor Resource
+ * @param {Function} fn Validation function.
+ * @return {Boolean} true if there were errors, else false.
+ * @api public
+ */
+
+exports.isValid = function(fn){
+  this.validate(fn);
+  return 0 === this.errors.length;
+};
+
+/**
+ * Perform validations.
+ *
+ * @constructor Resource
+ * @param {Function} fn Validation function.
+ * @return {Boolean} true if there were errors, else false.
+ * @api private
+ */
+
+exports.validate = function(fn){
+  var self = this;
+  this.errors = [];
+  this.emit('validating', this);
+  // XXX: need single `validateAttributes`
+  // XXX: need to store validators by key.
+  each(this.constructor.validators, this, function(){
+    // self.emit('after-validate', self);
+    // self.emit('validated', self);
+    self.emit('validate', self);
+
+    if (fn) {
+      if (self.errors.length)
+        fn(new Error('Validation Error'));
+      else
+        fn(); 
+    }
+  });
+  return 0 === this.errors.length;
+};
+
+/**
+ * Set attribute value.
+ *
+ * @constructor Resource
+ * @chainable
+ * @param {String} name Attribute name.
+ * @param {Mixed} val Attribute value.
+ * @param {Boolean} quiet If true, won't dispatch change events.
+ * @return {Resource}
+ * @api public
+ */
+
+exports.set = function(name, val, quiet){
+  var attr = this.constructor.attrs[name];
+  if (!attr) return; // XXX: throw some error, or dynamic property flag?
+  if (undefined === val && attr.hasDefaultValue)
+    val = attr.apply(this);
+  val = attr.typecast(val);
+  var prev = this.attrs[name];
+  this.dirty[name] = val;
+  this.attrs[name] = val;
+
+  // XXX: this `quiet` functionality could probably be implemented
+  //   in a less ad-hoc way. It is currently only used when setting
+  //   properties passed in through `init`, such as from a db/adapter
+  //   serializing data into a resource, doesn't need to dispatch changes.
+  if (!quiet) {
+    this.constructor.emit('change ' + name, this, val, prev);
+    this.emit('change ' + name, val, prev); 
+  }
+  return this;
+};
+
+/**
+ * Get `name` value.
+ *
+ * @constructor Resource
+ * @param {String} name Attribute name.
+ * @return {Mixed} Attribute value.
+ * @api public
+ */
+
+exports.get = function(name){
+  // XXX: need a better way to do this
+  if ('id' === name && this.__id__) return this.__id__;
+  if (undefined === this.attrs[name]) {
+    var attr = this.defaultAttr(name)
+    if (attr)
+      return this.attrs[name] = attr.apply(this);
+  } else {
+    return this.attrs[name];
+  }
+};
+
+/**
+ * Check if `attr` is present (not `null` or `undefined`).
+ *
+ * @constructor Resource
+ * @param {String} attr Attribute name.
+ * @return {Boolean} true if attribute exists, else false.
+ * @api public
+ */
+
+exports.has = function(attr){
+  return null != this.attrs[attr];
+};
+
+/**
+ * Return the JSON representation of the resource.
+ *
+ * @constructor Resource
+ * @return {Object} Resource attributes.
+ * @api public
+ */
+
+exports.toJSON = function(){
+  return this.attrs;
+};
+
+/**
+ * Returns `Attr` definition if it has a default value.
+ *
+ * @constructor Resource
+ * @param {String} name Attribute name.
+ * @return {Boolean|Function} Attr definition if it exists, else.
+ * @api private
+ */
+
+exports.defaultAttr = function(name){
+  var defaultAttrs = this.constructor.attrs.__default__;
+  return defaultAttrs.hasOwnProperty(name) && defaultAttrs[name];
+};
+});
+require.register("tower-program/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var Emitter = require("tower-emitter");
+var stream = require("tower-stream").ns('program');
+var proto = require("./lib/proto");
+var statics = require("./lib/statics");
+
+/**
+ * Expose `program`.
+ */
+
+exports = module.exports = program;
+
+/**
+ * Expose `collection`.
+ */
+
+exports.collection = [];
+
+/**
+ * Get/set `Program`.
+ */
+
+function program(name) {
+  if (exports.collection[name])
+    return exports.collection[name];
+
+  function Program(name) {
+    this.inputs = initStreams(Program.inputs);
+    this.outputs = initStreams(Program.outputs);
+  }
+
+  // statics
+
+  for (var key in statics) Program[key] = statics[key];
+
+  Program.id = name;
+  Program.inputs = [];
+  Program.outputs = [];
+  Program.stream = stream.ns(name);
+
+  // prototype
+
+  Program.prototype = {};
+  Program.prototype.constructor = Program;
+  
+  for (var key in proto) Program.prototype[key] = proto[key];
+
+  exports.collection[name] = Program;
+  exports.collection.push(Program);
+
+  return Program;
+}
+
+function initStreams(streams) {
+  var result = [];
+  for (var name in streams) {
+    result.push(streams[name].create());
+  }
+  return result;
+}
+});
+require.register("tower-program/lib/proto.js", function(exports, require, module){
+
+exports.input = function(name, fn){
+  if (undefined === fn) return this.inputs[name];
+  this.inputs[name] = fn;
+  this.inputs.push(fn);
+  return this;
+};
+
+exports.output = function(name, fn){
+  if (undefined === fn) return this.outputs[name];
+  this.outputs[name] = fn;
+  this.outputs.push(fn);
+  return this;
+};
+});
+require.register("tower-program/lib/statics.js", function(exports, require, module){
+
+/**
+ * Instantiate a new `Program`.
+ *
+ * @param {Object} options
+ * @return {Program}
+ */
+
+exports.init = function(options){
+  return new this(options);
+};
+
+/**
+ * Define input by `name`.
+ *
+ * @param {String} name
+ * @param {Mixed} obj Function or stream constructor.
+ */
+
+exports.input = function(name, obj){
+  // XXX: 'function' === typeof obj ...
+  this.inputs[name] = obj = this.stream(name, obj);
+  // this.inputs.push(obj);
+  return this;
+};
+
+/**
+ * Define output by `name`.
+ *
+ * @param {String} name
+ * @param {Mixed} obj Function or stream constructor.
+ */
+
+exports.output = function(name, obj){
+  this.outputs[name] = obj = this.stream(name, obj);
+  //this.outputs.push(obj);
+  return this;
+};
+});
+require.register("part-each-array/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var nativeForEach = [].forEach;
+
+/**
+ * Expose `each`.
+ */
+
+module.exports = each;
+
+/**
+ * Array iterator.
+ */
+
+function each(arr, iterator, context) {
+  if (null == arr) return;
+  if (nativeForEach && arr.forEach === nativeForEach) {
+    arr.forEach(iterator, context);
+  } else {
+    for (var i = 0, n = arr.length; i < n; i++) {
+      if (false === iterator.call(context, arr[i], i, arr)) return;
+    }
+  }
+}
+
+});
+require.register("tower-query/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var each = require("part-each-array");
+var isArray = require("part-is-array");
+var Constraint = require("./lib/constraint");
+var validate = require("./lib/validate");
+var validateConstraints = require("./lib/validate-constraints");
+var filter = require("./lib/filter");
+var subscriber = require("./lib/subscriber");
+
+/**
+ * Expose `query`.
+ */
+
+exports = module.exports = query;
+
+/**
+ * Expose `Query`.
+ */
+
+exports.Query = Query;
+
+/**
+ * Expose `Constraint`.
+ */
+
+exports.Constraint = Constraint;
+
+/**
+ * Wrap an array for chaining query criteria.
+ *
+ * @param {String} name A query name.
+ * @return {Query} A query.
+ * @api public
+ */
+
+function query(name) {
+  return null == name
+    ? new Query
+    : exports.collection[name]
+      ? exports.collection[name].clone()
+      : (exports.collection[name] = new Query(name));
+}
+
+/**
+ * Named queries.
+ */
+
+exports.collection = {};
+
+/**
+ * Queryable adapters.
+ */
+
+exports.adapters = [];
+
+/**
+ * Expose `filter`.
+ */
+
+exports.filter = filter;
+
+/**
+ * Validate query constraints.
+ */
+
+exports.validate = validateConstraints;
+
+/**
+ * Make an adapter queryable.
+ *
+ * XXX: The main reason for doing it this way
+ *      is to not create circular dependencies.
+ *
+ * @chainable
+ * @param {Adapter} adapter An adapter object.
+ * @return {Function} exports The main `query` function.
+ * @api public
+ */
+
+exports.use = function(adapter){
+  exports.adapters[adapter.name] = adapter;
+  exports.adapters.push(adapter);
+  return exports;
+};
+
+/**
+ * Class representing a query.
+ *
+ * @class
+ * @param {String} name A query instance's name.
+ * @api public
+ */
+
+function Query(name) {
+  this.name = name;
+  this.constraints = [];
+  this.resources = [];
+  this.sorting = [];
+  this.paging = {};
+  // XXX: accomplish both joins and graph traversals.
+  this.relations = [];
+  // this.starts = []
+  // this.groupings = {}
+}
+
+/**
+ * Explicitly tell the query what adapters to use.
+ *
+ * If not specified, it will do its best to find
+ * the adapter. If one or more are specified, the
+ * first specified will be the default, and its namespace
+ * can be left out of the resources used in the query
+ * (e.g. `user` vs. `facebook.user` if `query().use('facebook').select('user')`).
+ *
+ * @chainable
+ * @param {Mixed} name Name of the adapter, or the adapter object itself.
+ *   In `package.json`, maybe this is under a `"key": "memory"` property.
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.use = function(name){
+  (this.adapters || (this.adapters = []))
+    .push('string' === typeof name ? exports.adapters[name] : name);
+  return this;
+};
+
+/**
+ * The starting table or record for the query.
+ *
+ * @chainable
+ * @param {String} key The starting table or record name.
+ * @param {Object} val
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.start = function(key, val){
+  this._start = key;
+  (this.starts || (this.starts = [])).push(queryModel(key));
+  return this;
+};
+
+/**
+ * Add a query pattern to be returned.
+ * XXX: http://docs.neo4j.org/chunked/stable/query-return.html
+ *
+ * @param {String} key A query pattern that you want to be returned.
+ * @return {Query}
+ */
+
+Query.prototype.returns = function(key){
+  this.resources.push(queryAttr(key, this._start));
+  return this;
+};
+
+/**
+ * Start a SELECT query.
+ *
+ * @chainable
+ * @param {String} key A record or table name.
+ * @return {Query}
+ * @api public
+ */
+Query.prototype.resource = function(key){
+  this._start = this._start || key;
+  this.resources.push(queryModel(key, this._start));
+  return this;
+};
+
+/**
+ * Add a WHERE clause.
+ *
+ * @param {String} key A record or table property/column name.
+ * @return {Query}
+ * @api public
+ */
+Query.prototype.where = function(key){
+  this.context = key;
+  return this;
+};
+
+/**
+ * In a graph database, the data pointing _to_ this node.
+ * In a relational/document database, the records with
+ * a foreign key pointing to this record or set of records.
+ *
+ * Example:
+ *
+ *    query().start('users')
+ *      .incoming('friends')
+ *      .incoming('friends');
+ *
+ * @chainable
+ * @param {String} key Name of the data coming to the start node.
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.incoming = function(key){
+  return this.relation('incoming', key);
+};
+
+/**
+ * In a graph database, the data pointing _from_ this node.
+ * In a relational/document database, the record this
+ * record points to via its foreign key.
+ *
+ * Example:
+ *
+ *    query().start('users')
+ *      .outgoing('friends')
+ *      .outgoing('friends');
+ *
+ * @chainable
+ * @param {String} key Name of the data going out from the start node.
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.outgoing = function(key){
+  return this.relation('outgoing', key);
+};
+
+/**
+ * What the variable should be called for the data returned.
+ * References the previous item in the query.
+ *
+ * Example:
+ *
+ *    query().start('users').as('people');
+ *
+ * @param {String} key The data's new variable name.
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.as = function(key){
+  // XXX: todo
+  this.resources[this.resources.length - 1].alias = key;
+  return this;
+};
+
+/**
+ * Append constraint to query.
+ *
+ * Example:
+ *
+ *    query().start('users').where('likeCount').lte(200);
+ *
+ * @param {String} key The property to compare `val` to.
+ * @param {Number|Date} val The number or date value.
+ * @api public
+ */
+
+each(['eq', 'neq', 'gte', 'gt', 'lte', 'lt', 'nin', 'match'], function(operator){
+  Query.prototype[operator] = function(val){
+    return this.constraint(this.context, operator, val);
+  }
+});
+
+/**
+ * Check if the value exists within a set of values.
+ *
+ * @chainable
+ * @param {Object} val The constraint value.
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.contains = function(val){
+  return this.constraint(this.context, 'in', val);
+};
+
+/**
+ * Append action to query, then execute.
+ *
+ * Example:
+ *
+ *    query().start('users')
+ *      .insert({ email: 'john.smith@gmail.com' });
+ *
+ *    query().start('users').query(fn);
+ *
+ * @api public
+ */
+
+each([
+    'select'
+  , 'pipe'
+  , 'stream'
+  , 'count'
+  , 'exists'
+], function(action){
+  Query.prototype[action] = function(fn){
+    return this.action(action).exec(fn);
+  }
+});
+
+/**
+ * Create one or more records.
+ *
+ * This is different from the other actions 
+ * in that it can take data (records) as arguments.
+ *
+ * Example:
+ *
+ *    query()
+ *      .use('memory')
+ *      .select('post')
+ *      .create({ title: 'Foo' }, function(err, post){
+ *
+ *      });
+ *
+ * @param {Object} data Data record.
+ * @param {Function} fn Function to be executed on record creation.
+ * @return {Mixed} Whatever `fn` returns on the `create` action.
+ * @api public
+ */
+
+Query.prototype.create = function(data, fn){
+  return this.action('create', data).exec(fn);
+};
+
+/**
+ * Update one or more records.
+ *
+ * This is different from the other actions
+ * in that it can take data (records) as arguments.
+ *
+ * Example:
+ *
+ *    query()
+ *      .use('memory')
+ *      .select('post')
+ *      .update({ title: 'Foo' }, function(err, post){
+ *
+ *      });
+ *
+ * @param {Object} data Data record.
+ * @param {Function} fn Function to be executed on record update.
+ * @return {Mixed} Whatever `fn` returns on the `update` action.
+ * @api public
+ */
+
+Query.prototype.update = function(data, fn){
+  return this.action('update', data).exec(fn);
+};
+
+Query.prototype.remove = function(data, fn){
+  return 2 === arguments.length
+    ? this.action('remove', data).exec(fn)
+    : this.action('remove').exec(data);
+};
+
+/**
+ * Return the first record that matches the query pattern.
+ *
+ * @param {Function} fn Function to execute on records after `find` action finishes.
+ * @api public
+ */
+
+Query.prototype.first = function(fn){
+  this.limit(1).action('find').exec(function(err, records){
+    if (err) return fn(err);
+    fn(err, records[0]);
+  });
+};
+
+/**
+ * Return the last record that matches the query pattern.
+ *
+ * @param {Function} fn Function to execute on records after `find` action finishes.
+ * @api public
+ */
+
+Query.prototype.last = function(fn){
+  this.limit(1).action('find').exec(function(err, records){
+    if (err) return fn(err);
+    fn(err, records[0]);
+  });
+};
+
+/**
+ * Add a record query LIMIT.
+ *
+ * @chainable
+ * @param {Integer} val The record limit.
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.limit = function(val){
+  this.paging.limit = val;
+  return this;
+};
+
+/**
+ * Specify the page number.
+ *
+ * Use in combination with `limit` for calculating `offset`.
+ *
+ * @chainable
+ * @param {Integer} val The page number.
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.page = function(val){
+  this.paging.page = val;
+  return this;
+};
+
+/**
+ * Specify the offset.
+ *
+ * @chainable
+ * @param {Integer} val The offset value.
+ * @return {Query}
+ * @api public
+ */
+Query.prototype.offset = function(val){
+  this.paging.offset = val;
+  return this;
+};
+
+/**
+ * Sort ascending by `key`.
+ *
+ * If the key is a property name, it will
+ * be combined with the table/collection name
+ * defined somewhere earlier in the query.
+ *
+ * Example:
+ *
+ *    query().start('users').asc('createdAt');
+ *
+ * @chainable
+ * @param {String} key A property name.
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.asc = function(key){
+  return this.sort(key, 1);
+};
+
+/**
+ * Sort descending by `key`.
+ *
+ * If the key is a property name, it will
+ * be combined with the table/collection name
+ * defined somewhere earlier in the query.
+ *
+ * Example:
+ *
+ *    query().start('users').desc('createdAt');
+ *
+ * @chainable
+ * @param {String} key A property name.
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.desc = function(key){
+  return this.sort(key, -1);
+};
+
+/**
+ * Pushes a `"relation"` onto the query.
+ *
+ * @chainable
+ * @param {String} dir The direction.
+ * @param {String} key The key.
+ * @return {Query}
+ * @api private
+ */
+
+Query.prototype.relation = function(dir, key){
+  var attr = queryAttr(key, this._start);
+  attr.direction = dir;
+  this.relations.push(attr);
+  return this;
+};
+
+/**
+ * Pushes a `"constraint"` onto the query.
+ *
+ * @chainable
+ * @param {String} key The constraint key.
+ * @param {String} op Operator string
+ * @param {Object} val The constraint value.
+ * @return {Query}
+ * @api public
+ *
+ * @see http://en.wikipedia.org/wiki/Lagrange_multiplier
+ */
+
+Query.prototype.constraint = function(key, op, val){
+  this.constraints.push(new Constraint(key, op, val, this._start));
+  return this;
+};
+
+/**
+ * Pushes an `"action"` onto the query.
+ *
+ * Example:
+ *
+ *    query().action('insert', { message: 'Test' });
+ *    query().action('insert', [ { message: 'one.' }, { message: 'two.' } ]);
+ *
+ * @chainable
+ * @param {String} type The action type.
+ * @param {Object|Array} data The data to act on.
+ * @return {Query}
+ * @api private
+ */
+
+Query.prototype.action = function(type, data){
+  this.type = type
+  this.data = data ? isArray(data) ? data : [data] : undefined;
+  return this;
+};
+
+// XXX: only do if it decreases final file size
+// each(['find', 'create', 'update', 'delete'])
+
+/**
+ * Pushes a sort direction onto the query.
+ *
+ * @chainable
+ * @param {String} key The property to sort on.
+ * @param {Integer} dir Direction it should point (-1, 1, 0).
+ * @return {Query}
+ * @api private
+ */
+
+Query.prototype.sort = function(key, dir){
+  var attr = queryAttr(key, this._start);
+  attr.direction = key;
+  this.sorting.push(attr);
+  return this;
+};
+
+/**
+ * A way to log the query criteria,
+ * so you can see if the adapter supports it.
+ *
+ * @chainable
+ * @param {Function} fn The query criteria logging function
+ * @return {Query}
+ * @api public
+ */
+
+Query.prototype.explain = function(fn){
+  this._explain = fn;
+  return this;
+};
+
+/**
+ * Clone the current `Query` object.
+ *
+ * @return {Query} A cloned `Query` object.
+ * @api public
+ */
+
+Query.prototype.clone = function(){
+  return new Query(this.name);
+};
+
+/**
+ * Execute the query.
+ * XXX: For now, only one query per adapter.
+ *      Later, you can query across multiple adapters
+ *
+ * @see http://en.wikipedia.org/wiki/Query_optimizer
+ * @see http://en.wikipedia.org/wiki/Query_plan
+ * @see http://homepages.inf.ed.ac.uk/libkin/teach/dbs12/set5.pdf
+ * @param {Function} fn Function that gets called on adapter execution.
+ * @return {Mixed} Whatever `fn` returns on execution.
+ * @api public
+ */
+
+Query.prototype.exec = function(fn){
+  this.context = this._start = undefined;
+  var adapter = this.adapters && this.adapters[0] || exports.adapters[0];
+  this.validate(function(){});
+  if (this.errors && this.errors.length) return fn(this.errors);
+  if (!this.resources[0]) throw new Error('Must `.select(resourceName)`');
+  return adapter.exec(this, fn);
+};
+
+/**
+ * Validate the query on all adapters.
+ *
+ * @param {Function} fn Function called on query validation.
+ * @api public
+ */
+
+Query.prototype.validate = function(fn){
+  var adapter = this.adapters && this.adapters[0] || exports.adapters[0];
+  validate(this, adapter, fn);
+};
+
+/**
+ * Subscribe to a type of query.
+ *
+ * @param {Function} fn Function executed on each subscriber output.
+ * @api public
+ */
+
+Query.prototype.subscribe = function(fn){
+  var self = this;
+  subscriber.output(this.type, function(record){
+    if (self.test(record)) fn(record);
+  });
+};
+
+/**
+ * Define another query on the parent scope.
+ *
+ * XXX: wire this up with the resource (for todomvc).
+ *
+ * @param {String} name A query name.
+ * @return {Query} A `Query` object.
+ * @api public
+ */
+
+Query.prototype.query = function(name) {
+  return query(name);
+};
+
+function queryModel(key) {
+  key = key.split('.');
+
+  if (2 === key.length)
+    return { adapter: key[0], resource: key[1], ns: key[0] + '.' + key[1] };
+  else
+    return { resource: key[0], ns: key[0] }; // XXX: adapter: adapter.default()
+}
+
+/**
+ * Variables used in query.
+ */
+
+function queryAttr(val, start){
+  var variable = {};
+
+  val = val.split('.');
+
+  switch (val.length) {
+    case 3:
+      variable.adapter = val[0];
+      variable.resource = val[1];
+      variable.attr = val[2];
+      variable.ns = variable.adapter + '.' + variable.resource;
+      break;
+    case 2:
+      variable.adapter = 'memory'; // XXX: adapter.default();
+      variable.resource = val[0];
+      variable.attr = val[1];
+      variable.ns = variable.resource;
+      break;
+    case 1:
+      variable.adapter = 'memory'; // XXX: adapter.default();
+      variable.resource = start;
+      variable.attr = val[0];
+      variable.ns = variable.resource;
+      break;
+  }
+
+  variable.path = variable.ns + '.' + variable.attr;
+
+  return variable;
+}
+
+function queryValue(val) {
+  // XXX: eventually handle relations/joins.
+  return { value: val, type: typeof(val) };
+}
+});
+require.register("tower-query/lib/constraint.js", function(exports, require, module){
+
+/**
+ * Expose `Constraint`.
+ */
+
+module.exports = Constraint;
+
+/**
+ * Class representing a query constraint.
+ *
+ * @class
+ *
+ * @param {String} a The left constraint.
+ * @param {String} operator The constraint.
+ * @param {String} b The right constraint.
+ * @param {Object} start The starting object.
+ * @api public
+ */
+
+function Constraint(a, operator, b, start) {
+  this.left = left(a, start);
+  this.operator = operator;
+  this.right = right(b);
+}
+
+function left(val, start) {
+  var variable = {};
+
+  val = val.split('.');
+
+  switch (val.length) {
+    case 3:
+      variable.adapter = val[0];
+      variable.resource = val[1];
+      variable.attr = val[2];
+      variable.ns = variable.adapter + '.' + variable.resource;
+      break;
+    case 2:
+      variable.adapter = 'memory'; // XXX: adapter.default();
+      variable.resource = val[0];
+      variable.attr = val[1];
+      variable.ns = variable.resource;
+      break;
+    case 1:
+      variable.adapter = 'memory'; // XXX: adapter.default();
+      variable.resource = start;
+      variable.attr = val[0];
+      variable.ns = variable.resource;
+      break;
+  }
+  
+  variable.path = variable.ns + '.' + variable.attr;
+
+  return variable;
+}
+
+function right(val) {
+  // XXX: eventually handle relations/joins.
+  return { value: val, type: typeof(val) };
+}
+});
+require.register("tower-query/lib/validate.js", function(exports, require, module){
+
+/**
+ * Expose `validate`.
+ */
+
+module.exports = validate;
+
+/**
+ * Add validations to perform before this is executed.
+ *
+ * XXX: not implemented.
+ *
+ * @param {Query} query A query object.
+ * @param {Adapter} adapter An adapter object.
+ * @param {Function} fn Function executed at the end of validation.
+ */
+
+function validate(query, adapter, fn) {
+  // XXX: only supports one action at a time atm.
+  var constraints = query.constraints;
+  var type = query.type;
+  query.errors = [];
+  // XXX: collect validators for resource and for each attribute.
+  // var resourceValidators = resource(criteria[0][1].ns).validators;
+  for (var i = 0, n = constraints.length; i < n; i++) {
+    var constraint = constraints[i];
+
+    if (!adapter.action.exists(constraint.left.resource + '.' + type))
+      continue;
+
+    var stream = adapter.action(constraint.left.resource + '.' + type);
+    var param = stream.params && stream.params[constraint.left.attr];
+    if (param && param.validate(query, constraint)) {
+      // $ tower list ec2:group --name 'hello-again-again,hello-again'
+      constraint.right.value = param.typecast(constraint.right.value);
+    }
+  }
+
+  query.errors.length ? fn(query.errors) : fn();
+}
+});
+require.register("tower-query/lib/validate-constraints.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var validator = require("tower-validator");
+
+/**
+ * Expose `validate`.
+ */
+
+module.exports = validate;
+
+/**
+ * Validate an object against an array of constraints.
+ *
+ * To define validations, use the `tower-validator` module.
+ * XXX: that isn't implemented yet, they're in here.
+ *
+ * @param {Object} obj Record or other simple JavaScript object.
+ * @param {Array} constraints Array of constraints.
+ * @return {Boolean} true if obj passes all constraints, otherwise false.
+ */
+
+function validate(obj, constraints) {
+  for (var i = 0, n = constraints.length; i < n; i++) {
+    // XXX: obj vs. obj.get
+    var constraint = constraints[i]
+      , left = obj.get ? obj.get(constraint.left.attr) : obj[constraint.left.attr]
+      , right = constraint.right.value;
+
+    if (!validator(constraint.operator)(left, right))
+      return false;
+  }
+
+  return true;
+}
+});
+require.register("tower-query/lib/filter.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var validateConstraints = require("./validate-constraints");
+
+/**
+ * Expose `filter`.
+ */
+
+module.exports = filter;
+
+/**
+ * Filter records based on a set of constraints.
+ *
+ * This is a robust solution, hooking into an
+ * extendable validation system. If you just need
+ * something simple, use the built-in `array.filter`.
+ *
+ * @param {Array} array Array of plain objects (such as records).
+ * @param {Array} constraints Array of constraints.
+ * @return {Array} The filtered records.
+ */
+
+function filter(array, constraints) {
+  if (!constraints.length) return array;
+
+  var result = [];
+
+  // XXX: is there a more optimal algorithm?
+  for (var i = 0, n = array.length; i < n; i++) {
+    if (validateConstraints(array[i], constraints))
+      result.push(array[i]);
+  }
+
+  return result;
+}
+});
+require.register("tower-query/lib/subscriber.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var program = require("tower-program");
+
+/**
+ * Expose `query-subscriber` program.
+ */
+
+module.exports = subscriber();
+
+/**
+ * Define a query subscribing program.
+ *
+ * @return {Program} A query subscriber program.
+ */
+
+function subscriber() {
+  program('query-subscriber')
+    .input('create')
+    .input('update')
+    .input('remove');
+
+  return program('query-subscriber').init();
+}
+});
+require.register("tower-adapter/index.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var Emitter = require("tower-emitter");
+var stream = require("tower-stream");
+var resource = require("tower-resource");
+var query = require("tower-query");
+var type = require("tower-type");
+var load = require("tower-load");
+
+/**
+ * Expose `adapter`.
+ */
+
+exports = module.exports = adapter;
+
+/**
+ * Expose `collection`.
+ */
+
+exports.collection = [];
+
+/**
+ * Expose `Adapter` constructor.
+ */
+
+exports.Adapter = Adapter;
+
+/**
+ * Lazily get an adapter instance by `name`.
+ *
+ * @param {String} name An adapter name.
+ * @return {Adapter} An adapter.
+ * @api public
+ */
+
+function adapter(name) {
+  if (exports.collection[name]) return exports.collection[name];
+  if (exports.load(name)) return exports.collection[name];
+
+  var obj = new Adapter(name);
+  exports.collection[name] = obj;
+  // exports.collection.push(obj);
+  // XXX: if has any event listeners...
+  exports.emit('define', obj);
+  return obj;
+}
+
+/**
+ * Mixin `Emitter`.
+ */
+
+Emitter(exports);
+
+/**
+ * Lazy-load adapters.
+ *
+ * @param {String} name An adapter name.
+ * @return {Adapter} An adapter.
+ * @api public
+ */
+
+exports.load = function(name, path){
+  return 1 === arguments.length
+    ? load(exports, name)
+    : load.apply(load, [exports].concat(Array.prototype.slice.call(arguments)));
+};
+
+/**
+ * Check if adapter `name` exists.
+ *
+ * @param {String} name An adapter name.
+ * @return {Boolean} true if adapter exists, otherwise false.
+ * @api public
+ */
+
+exports.exists = function(name){
+  return !!exports.collection[name];
+};
+
+// XXX: remove `exists` in favor of `has`.
+exports.has = exports.exists;
+
+/**
+ * Class representing an abstraction over remote services and databases.
+ *
+ * @class
+ *
+ * @param {String} name An adapter name.
+ * @api public
+ */
+
+function Adapter(name) {
+  this.name = name;
+  this.context = this;
+  this.types = {};
+  this.settings = {};
+  // XXX
+  this.resources = {};
+  this.connections = {};
+  //this.resource = this.resource.bind(this);
+  // XXX: refactor, should handle namespacing.
+  this.resource = resource.ns(name);
+  this.action = stream.ns(name);
+  // XXX: todo
+  // this.type = type.ns(name);
+
+  // make queryable.
+  // XXX: add to `clear` for both (or something like).
+  query.use(this);
+}
+
+/**
+ * Start a query against this adapter.
+ *
+ * @return {Mixed} Whatever the implementation of the use function attribute returns.
+ * @api public
+ */
+
+Adapter.prototype.query = function(){
+  return query().use(this);
+};
+
+/**
+ * Use database/connection (config).
+ *
+ * @param {String} name An adapter name.
+ * @api public
+ */
+
+Adapter.prototype.use = function(name){
+  throw new Error('Adapter#use not implemented');
+};
+
+/**
+ * Define connection settings.
+ *
+ * @param {String} name An adapter name.
+ * @param {Object} options Adapter options.
+ * @api public
+ */
+
+Adapter.prototype.connection = function(name, options){
+  if (1 === arguments.length && 'string' == typeof name) {
+    setting = this.context = settings[name]
+    return this;
+  }
+
+  if ('object' === typeof name) options = name;
+  options || (options = {});
+  options.name || (options.name = name);
+  setting = this.context = settings[options.name] = options;
+
+  return this;
+};
+
+/**
+ * Datatype serialization.
+ *
+ * @chainable
+ * @param {String} name An adapter name.
+ * @return {Adapter}
+ * @api public
+ */
+
+Adapter.prototype.type = function(name){
+  this.context =
+    this.types[name] || (this.types[name] = type(this.name + '.' + name));
+  return this;
+};
+
+/**
+ * Delegate to `type`.
+ *
+ * XXX: This may just actually become the `type` object itself.
+ *
+ * @chainable
+ * @param {String} name An adapter name.
+ * @return {Adapter}
+ * @api public
+ */
+
+Adapter.prototype.serializer = function(name){
+  // `this.types[x] === this.context`
+  this.context.serializer(name);
+  return this;
+};
+
+/**
+ * Set a `to` relationship.
+ *
+ * @chainable
+ * @param {Function} fn Function executed on `to` query.
+ * @return {Adapter}
+ * @api public
+ */
+
+Adapter.prototype.to = function(fn){
+  this.context.to(fn);
+  return this;
+};
+
+/**
+ * Set a `from` relationship.
+ *
+ * @chainable
+ * @param {Function} fn Function executed on `from` query.
+ * @return {Adapter}
+ * @api public
+ */
+
+Adapter.prototype.from = function(fn){
+  this.context.from(fn);
+  return this;
+};
+
+/**
+ * Main Adapter function the query object executes which you need to implement on your own adapter.
+ *
+ * @chainable
+ * @param {Query} query A query object.
+ * @param {Function} fn Adapter implementation function.
+ * @return {Adapter}
+ * @api public
+ */
+
+Adapter.prototype.exec = function(query, fn){
+  throw new Error('Adapter#exec not implemented.');
+};
+
+/**
+ * Reset the context to `this`.
+ *
+ * @chainable
+ * @return {Adapter}
+ * @api public
+ */
+
+Adapter.prototype.self = function(){
+  return this.context = this;
+};
+
+var methods = [ 'connect', 'disconnect', 'query', 'use', 'type', 'to', 'from' ];
+
+Adapter.prototype.api = function(){
+  if (this._api) return this._api;
+
+  var self = this;
+
+  function fn(name) {
+    return name
+      ? self.query().select(name)
+      : self;
+  }
+
+  var i = methods.length;
+  while (i--)
+    api(fn, methods[i], this);
+
+  return this._api = fn;
+};
+
+function api(fn, method, adapter) {
+  fn[method] = function(){
+    return adapter[method].apply(adapter, arguments);
+  }
+}
+});
+require.register("openautomation/lib/rest.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var adapter = require("tower-adapter")('openautomation');
+var agent = require("visionmedia-superagent");
+
+/**
+ * Map of model names to REST API names.
+ */
+
+var names = {
+  action: 'actions',
+  user: 'users',
+  experiment: 'experiments'
+};
+
+/**
+ * Map of query actions to HTTP methods.
+ */
+
+var methods = {
+  select: 'GET',
+  create: 'POST',
+  update: 'PUT',
+  remove: 'DELETE'
+};
+
+var calls = {
+  get: 'get',
+  post: 'post',
+  put: 'put',
+  'delete': 'del'
+};
+
+/**
+ * Expose `adapter`.
+ */
+
+exports = module.exports = adapter;
+
+/**
+ * API Version.
+ */
+
+exports.v = 'v1';
+exports.url = window.location.protocol + '//' + window.location.host;
+
+/**
+ * XXX: way to specify headers for all requests.
+ */
+
+exports.header = function(name, val){
+
+};
+
+exports.params = [];
+exports.param = function(name, val){
+  exports.params.push({ name: name, val: val });
+  return exports;
+};
+
+/**
+ * Convert query into REST API request.
+ *
+ * @param {Query} query A `Query` object.
+ * @param {Function} fn Callback function.
+ */
+
+adapter.exec = function(query, fn){
+  var name = query.resources[0].resource;
+  name = names[name] || name + 's';
+  var method = methods[query.type];
+  var call = calls[method.toLowerCase()];
+  var params = serializeParams(query);
+
+  var url = exports.url + '/api/' + exports.v + '/' + name;
+
+  var req = agent[call](url)
+    .set('Content-Type', 'application/json')
+    .set('Accept', 'application/json');
+
+  if (method === 'POST' || method === 'PUT' || method === 'DELETE') {
+    req.send(query.data || {});
+  }
+
+  req.query(params);
+
+  req.end(function(res){
+    if (fn) fn(res.error ? res.text : null, res.body);
+  });
+};
+
+/**
+ * Convert query constraints into query parameters.
+ *
+ * @param {Query} query
+ * @api private
+ */
+
+function serializeParams(query) {
+  var constraints = query.constraints;
+  var params = {};
+
+  constraints.forEach(function(constraint){
+    params[constraint.left.attr] = constraint.right.value;
+  });
+
+  return params;
+}
+});
 require.register("openautomation/lib/sprite.js", function(exports, require, module){
 
 /**
@@ -5358,7 +9479,17 @@ module.exports = Sprite;
  */
 
 function Sprite(parent, opts) {
+  opts = opts || {};
   this.parent = parent;
+
+  for (var name in opts) {
+    if (opts.hasOwnProperty(name)) {
+      this[name] = opts[name];
+    }
+  }
+
+  this.draw();
+  this.bind();
 }
 
 /**
@@ -5366,6 +9497,22 @@ function Sprite(parent, opts) {
  */
 
 Emitter(Sprite.prototype);
+
+/**
+ * Setup the drawing.
+ */
+
+Sprite.prototype.draw = function(){
+  throw new Error('Subclass must implement');
+};
+
+/**
+ * Setup event handlers.
+ */
+
+Sprite.prototype.bind = function(){
+
+};
 });
 require.register("openautomation/lib/microplate.js", function(exports, require, module){
 
@@ -5558,6 +9705,10 @@ require.register("openautomation/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
+var adapter = require("./lib/rest");
+var query = require("tower-query");
+query.use(adapter);
+var resource = require("tower-resource");
 var getUserMedia = require("juliangruber-get-user-media");
 var canvasPosition = require("brighthas-window2canvas");
 var transformBounds = require("intron-transform-bounds");
@@ -5600,6 +9751,9 @@ events.bind(canvas, 'click', function(e){
 });
 
 function sendMove(remote) {
+  // resource('action').create(remote, function(){
+  //   console.log('done', arguments);
+  // });
   agent.post('/actions')
     .send({ type: 'move', position: remote })
     .end(function(res){
@@ -5691,6 +9845,30 @@ function tick() {
   }
 }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

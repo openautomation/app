@@ -3,6 +3,10 @@
  * Module dependencies.
  */
 
+var adapter = require('./lib/rest');
+var query = require('tower-query');
+query.use(adapter);
+var resource = require('tower-resource');
 var getUserMedia = require('get-user-media');
 var canvasPosition = require('window2canvas');
 var transformBounds = require('transform-bounds');
@@ -45,6 +49,9 @@ events.bind(canvas, 'click', function(e){
 });
 
 function sendMove(remote) {
+  // resource('action').create(remote, function(){
+  //   console.log('done', arguments);
+  // });
   agent.post('/actions')
     .send({ type: 'move', position: remote })
     .end(function(res){
