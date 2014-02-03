@@ -2,6 +2,11 @@
 
 ## Development
 
+```
+git clone git@github.com:openautomation/openautomation.git
+cd openautomation
+```
+
 Install node modules:
 
 ```
@@ -14,17 +19,27 @@ Install client-side [component](http://component.io) modules:
 component install
 ```
 
-Install opencv and other OS packages:
+Start the app:
+
+```
+node app
+```
+
+Visit http://localhost:3000/index.html
+
+### Build on file change
+
+If you change any of the javascript, or add new components, make sure to rebuild:
+
+```
+component build && mv build/build.js public/javascripts/
+```
+
+### Install opencv and other OS packages (not necessary yet):
 
 ```
 brew tap homebrew/science
 brew install opencv
-```
-
-### Build on file change
-
-```
-component build && mv build/build.js public/javascripts/
 ```
 
 ## Resources
