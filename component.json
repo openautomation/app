@@ -5,7 +5,12 @@
   "version": "0.0.1",
   "keywords": [],
   "dependencies": {
-    "component/event": "*"},
+    "juliangruber/get-user-media": "*",
+    "brighthas/window2canvas": "*",
+    "component/event": "*",
+    "intron/transform-bounds": "*",
+    "visionmedia/superagent": "*"
+  },
   "development": {},
   "license": "MIT",
   "main": "index.js",
