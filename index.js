@@ -16,6 +16,12 @@ var drawing = SVG('sprites').fixSubPixelOffset();
  */
 
 var Microplate = require('./lib/microplate');
+var LiquidContainer = require('./lib/liquid-container');
+var PetriDish = require('./lib/petri-dish');
+
+/**
+ * Canvas.
+ */
 
 var video = document.getElementById('webcam');
 var canvas = document.getElementById('canvas');
@@ -74,6 +80,8 @@ function start() {
     // XXX: somehow get position from microplate.
     sendMove(well);
   });
+
+  var liquid = new LiquidContainer(drawing);
 }
 
 function success(stream) {

@@ -5392,12 +5392,14 @@ Emitter(Microplate.prototype);
 Microplate.prototype.draw = function(){
   // draw group
   var group = this.group = this.parent.group();
+  group.attr('class', 'microplate');
 
   // draw rectangle
   var rect = this.rect = this.parent.rect(100, 100);
   rect.radius(10);
   rect.fill({ opacity: 0 });
   rect.stroke({ width: 2 });
+  rect.attr('class', 'microplate-box');
   group.add(rect);
 
   // draw wells
@@ -5460,7 +5462,7 @@ Microplate.prototype.size = function(w, h){
  */
 
 Microplate.prototype.onclick = function(e){
-  this.emit('visit', e.target.__data__);
+  this.emit('select', e.target.__data__);
 };
 
 /**
@@ -5475,6 +5477,36 @@ function millimetersToPixels(mm) {
   // 1 mm = 72/25.4 = 2.8346
   return mm * mmRatio;
 }
+});
+require.register("openautomation/lib/liquid-container.js", function(exports, require, module){
+
+/**
+ * Expose `LiquidContainer`.
+ */
+
+module.exports = LiquidContainer;
+
+/**
+ * Instantiate a new `LiquidContainer`.
+ */
+
+function LiquidContainer(parent, opts) {
+  this.parent = parent;
+  this.opts = opts || {};
+  this.draw();
+}
+
+/**
+ * Draw.
+ */
+
+LiquidContainer.prototype.draw = function(){
+  this.drawing = this.parent.circle(this.opts.radius || 40);
+  this.drawing.fill({ color: 'blue' });
+};
+});
+require.register("openautomation/lib/petri-dish.js", function(exports, require, module){
+
 });
 require.register("openautomation/index.js", function(exports, require, module){
 
@@ -5495,6 +5527,12 @@ var drawing = SVG('sprites').fixSubPixelOffset();
  */
 
 var Microplate = require("./lib/microplate");
+var LiquidContainer = require("./lib/liquid-container");
+var PetriDish = require("./lib/petri-dish");
+
+/**
+ * Canvas.
+ */
 
 var video = document.getElementById('webcam');
 var canvas = document.getElementById('canvas');
@@ -5549,10 +5587,12 @@ function start() {
   var microplate = new Microplate(drawing);
   microplate.move(100, 100);
   //microplate.size(100, 200);
-  microplate.on('visit', function(well){
+  microplate.on('select', function(well){
     // XXX: somehow get position from microplate.
     sendMove(well);
   });
+
+  var liquid = new LiquidContainer(drawing);
 }
 
 function success(stream) {

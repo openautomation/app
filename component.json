@@ -19,6 +19,8 @@
   "main": "index.js",
   "scripts": [
     "lib/microplate.js",
+    "lib/liquid-container.js",
+    "lib/petri-dish.js",
     "index.js"
   ],
   "styles": [
