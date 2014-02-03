@@ -9754,7 +9754,9 @@ function sendMove(remote) {
   // resource('action').create(remote, function(){
   //   console.log('done', arguments);
   // });
-  console.log('selected', JSON.stringify(remote));
+  document.querySelector('#log').appendChild(
+    document.createTextNode('selected ' + JSON.stringify(remote))
+  );
 
   agent.post('/actions')
     .send({ type: 'move', position: remote })
