@@ -13,10 +13,12 @@ Install node modules:
 npm install
 ```
 
-Install client-side [component](http://component.io) modules:
+Install client-side [component](http://component.io) modules, and build:
 
 ```
 component install
+component build
+mv build/build.js public/javascripts/
 ```
 
 Start the app:
