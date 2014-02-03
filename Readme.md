@@ -25,7 +25,7 @@ Start the app:
 node app
 ```
 
-Visit http://localhost:3000/index.html
+Visit [http://localhost:3000/index.html](http://localhost:3000/index.html)
 
 ### Build on file change
 
