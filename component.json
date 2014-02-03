@@ -12,12 +12,14 @@
     "component/emitter": "*",
     "intron/transform-bounds": "*",
     "visionmedia/superagent": "*",
-    "wout/svg.js": "*"
+    "wout/svg.js": "*",
+    "component/inherit": "*"
   },
   "development": {},
   "license": "MIT",
   "main": "index.js",
   "scripts": [
+    "lib/sprite.js",
     "lib/microplate.js",
     "lib/liquid-container.js",
     "lib/petri-dish.js",

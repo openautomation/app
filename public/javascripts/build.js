@@ -5323,6 +5323,50 @@ require.register("wout-svg.js/dist/svg.js", function(exports, require, module){
 
 });
 require.main("wout-svg.js", "dist/svg.js")
+require.register("component-inherit/index.js", function(exports, require, module){
+
+module.exports = function(a, b){
+  var fn = function(){};
+  fn.prototype = b.prototype;
+  a.prototype = new fn;
+  a.prototype.constructor = a;
+};
+});
+require.register("openautomation/lib/sprite.js", function(exports, require, module){
+
+/**
+ * Module dependencies.
+ */
+
+var events = require("component-events");
+var Emitter = require("component-emitter");
+var inherit = require("component-inherit");
+
+/**
+ * Expose `Sprite`.
+ */
+
+module.exports = Sprite;
+
+/**
+ * Instantiate a new `Sprite`.
+ *
+ * A "sprite" is just a generic UI game-like component.
+ *
+ * @param {Object} opts Default properties on the sprite.
+ * @param {SVG} parent The parent SVG element.
+ */
+
+function Sprite(parent, opts) {
+  this.parent = parent;
+}
+
+/**
+ * Mixin `Emitter`.
+ */
+
+Emitter(Sprite.prototype);
+});
 require.register("openautomation/lib/microplate.js", function(exports, require, module){
 
 /**
@@ -5647,6 +5691,8 @@ function tick() {
   }
 }
 });
+
+
 
 
 
