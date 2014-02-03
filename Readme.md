@@ -17,8 +17,7 @@ Install client-side [component](http://component.io) modules, and build:
 
 ```
 component install
-component build
-mv build/build.js public/javascripts/
+component build && mv build/build.js public/javascripts/
 ```
 
 Start the app:
