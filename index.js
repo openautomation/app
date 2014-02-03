@@ -69,7 +69,7 @@ function start() {
   // add lab equipment
   var microplate = new Microplate(drawing);
   microplate.move(100, 100);
-  microplate.size(100, 200);
+  //microplate.size(100, 200);
   microplate.on('visit', function(){
     // XXX: somehow get position from microplate.
     sendMove({ x: 1200, y: 3500 });
