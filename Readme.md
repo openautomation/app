@@ -2,6 +2,16 @@
 
 ## Development
 
+Make sure you have XCode and XCode Developer Tools installed if you're on a mac, along with git and node.js.
+
+Then install component:
+
+```
+npm install -g component
+```
+
+Clone the repo:
+
 ```
 git clone git@github.com:openautomation/openautomation.git
 cd openautomation
