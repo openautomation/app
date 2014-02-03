@@ -8,13 +8,16 @@
     "juliangruber/get-user-media": "*",
     "brighthas/window2canvas": "*",
     "component/event": "*",
+    "component/events": "*",
     "intron/transform-bounds": "*",
-    "visionmedia/superagent": "*"
+    "visionmedia/superagent": "*",
+    "wout/svg.js": "*"
   },
   "development": {},
   "license": "MIT",
   "main": "index.js",
   "scripts": [
+    "lib/microplate.js",
     "index.js"
   ],
   "styles": [
