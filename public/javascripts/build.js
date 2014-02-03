@@ -588,14 +588,6 @@ function parse(event) {
 }
 
 });
-require.register("intron-transform-bounds/index.js", function(exports, require, module){
-module.exports = function(x, y, source, target) {
-  var newX = (x / source.width) * target.width;
-  var newY = (y / source.height) * target.height;
-  return { x: newX, y: newY };
-}
-
-});
 require.register("component-emitter/index.js", function(exports, require, module){
 
 /**
@@ -761,6 +753,14 @@ Emitter.prototype.listeners = function(event){
 Emitter.prototype.hasListeners = function(event){
   return !! this.listeners(event).length;
 };
+
+});
+require.register("intron-transform-bounds/index.js", function(exports, require, module){
+module.exports = function(x, y, source, target) {
+  var newX = (x / source.width) * target.width;
+  var newY = (y / source.height) * target.height;
+  return { x: newX, y: newY };
+}
 
 });
 require.register("component-reduce/index.js", function(exports, require, module){
@@ -5330,6 +5330,7 @@ require.register("openautomation/lib/microplate.js", function(exports, require, 
  */
 
 var events = require("component-events");
+var Emitter = require("component-emitter");
 
 /**
  * Expose `Microplate`.
@@ -5349,6 +5350,12 @@ function Microplate(drawing) {
   this.group.add(rect);
   this.bind();
 }
+
+/**
+ * Mixin `Emitter`.
+ */
+
+Emitter(Microplate.prototype);
 
 /**
  * Bind event listeners.
@@ -5382,7 +5389,7 @@ Microplate.prototype.size = function(w, h){
  */
 
 Microplate.prototype.onclick = function(e){
-  console.log(e);
+  this.emit('visit', e);
 };
 });
 require.register("openautomation/index.js", function(exports, require, module){
@@ -5423,12 +5430,16 @@ events.bind(canvas, 'click', function(e){
   // convert to coordinates of lab box
   var remote = transformBounds(local.x, local.y, canvas.getBoundingClientRect(), labBox);
 
+  sendMove(remote);
+});
+
+function sendMove(remote) {
   agent.post('/actions')
     .send({ type: 'move', position: remote })
     .end(function(res){
       console.log(res);
     });
-});
+}
 
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
@@ -5454,6 +5465,10 @@ function start() {
   var microplate = new Microplate(drawing);
   microplate.move(100, 100);
   microplate.size(100, 200);
+  microplate.on('visit', function(){
+    // XXX: somehow get position from microplate.
+    sendMove({ x: 1200, y: 3500 });
+  });
 }
 
 function success(stream) {

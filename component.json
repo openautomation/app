@@ -9,6 +9,7 @@
     "brighthas/window2canvas": "*",
     "component/event": "*",
     "component/events": "*",
+    "component/emitter": "*",
     "intron/transform-bounds": "*",
     "visionmedia/superagent": "*",
     "wout/svg.js": "*"
