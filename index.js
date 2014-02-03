@@ -70,9 +70,9 @@ function start() {
   var microplate = new Microplate(drawing);
   microplate.move(100, 100);
   //microplate.size(100, 200);
-  microplate.on('visit', function(){
+  microplate.on('visit', function(well){
     // XXX: somehow get position from microplate.
-    sendMove({ x: 1200, y: 3500 });
+    sendMove(well);
   });
 }
 

@@ -5403,10 +5403,7 @@ Microplate.prototype.draw = function(){
   // draw wells
   for (var i = 0; i < this.rows; i++) {
     for (var j = 0; j < this.columns; j++) {
-      this.drawWell(
-        this.padding.left + (j * (this.wellRadius + 1)),
-        this.padding.top + (i * (this.wellRadius + 1))
-      );
+      this.drawWell(i, j);
     }
   }
 
@@ -5417,11 +5414,17 @@ Microplate.prototype.draw = function(){
  * Draw well.
  */
 
-Microplate.prototype.drawWell = function(x, y){
+Microplate.prototype.drawWell = function(row, column){
+  var x = this.padding.left + (column * (this.wellRadius + 1));
+  var y = this.padding.top + (row * (this.wellRadius + 1));
+
   var circle = this.parent.circle(this.wellRadius);
+  circle.attr('class', 'microplate-well');
   circle.fill({ opacity: 0 });
   circle.stroke({ width: 1 });
   circle.move(x, y);
+  // XXX: all svg objects should be tied to formal data models with schemas eventually
+  circle.node.__data__ = { row: row, column: column };
   this.group.add(circle);
 };
 
@@ -5430,9 +5433,9 @@ Microplate.prototype.drawWell = function(x, y){
  */
 
 Microplate.prototype.bind = function(){
-  //this.events = events(this.rect, this);
-  //this.events.bind('click');
-  this.group.click(this.onclick.bind(this));
+  this.events = events(this.group.node, this);
+  this.events.bind('click .microplate-well');
+  //this.group.click(this.onclick.bind(this));
 };
 
 /**
@@ -5457,7 +5460,7 @@ Microplate.prototype.size = function(w, h){
  */
 
 Microplate.prototype.onclick = function(e){
-  this.emit('visit', e);
+  this.emit('visit', e.target.__data__);
 };
 
 /**
@@ -5546,9 +5549,9 @@ function start() {
   var microplate = new Microplate(drawing);
   microplate.move(100, 100);
   //microplate.size(100, 200);
-  microplate.on('visit', function(){
+  microplate.on('visit', function(well){
     // XXX: somehow get position from microplate.
-    sendMove({ x: 1200, y: 3500 });
+    sendMove(well);
   });
 }
 
