@@ -1,5 +1,11 @@
 
 /**
+ * Module dependencies.
+ */
+
+var move = require('../lib/xyz_sender');
+
+/**
  * Execute an action.
  */
 

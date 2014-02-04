@@ -46,18 +46,10 @@ function require(path, parent, orig) {
 require.modules = {};
 
 /**
- * Main definitions.
+ * Registered aliases.
  */
 
-require.mains = {};
-
-/**
- * Define a main.
- */
-
-require.main = function(name, path){
-  require.mains[name] = path;
-};
+require.aliases = {};
 
 /**
  * Resolve `path`.
@@ -74,7 +66,7 @@ require.main = function(name, path){
  */
 
 require.resolve = function(path) {
-  if ('/' == path.charAt(0)) path = path.slice(1);
+  if (path.charAt(0) === '/') path = path.slice(1);
 
   var paths = [
     path,
@@ -84,15 +76,10 @@ require.resolve = function(path) {
     path + '/index.json'
   ];
 
-  if (require.mains[path]) {
-    paths = [path + '/' + require.mains[path]];
-  }
-
-  for (var i = 0, len = paths.length; i < len; i++) {
+  for (var i = 0; i < paths.length; i++) {
     var path = paths[i];
-    if (require.modules.hasOwnProperty(path)) {
-      return path;
-    }
+    if (require.modules.hasOwnProperty(path)) return path;
+    if (require.aliases.hasOwnProperty(path)) return require.aliases[path];
   }
 };
 
@@ -113,7 +100,7 @@ require.normalize = function(curr, path) {
   curr = curr.split('/');
   path = path.split('/');
 
-  for (var i = 0, len = path.length; i < len; ++i) {
+  for (var i = 0; i < path.length; ++i) {
     if ('..' == path[i]) {
       curr.pop();
     } else if ('.' != path[i] && '' != path[i]) {
@@ -137,6 +124,21 @@ require.register = function(path, definition) {
 };
 
 /**
+ * Alias a module definition.
+ *
+ * @param {String} from
+ * @param {String} to
+ * @api private
+ */
+
+require.alias = function(from, to) {
+  if (!require.modules.hasOwnProperty(from)) {
+    throw new Error('Failed to alias "' + from + '", it does not exist');
+  }
+  require.aliases[to] = from;
+};
+
+/**
  * Return a require function relative to the `parent` path.
  *
  * @param {String} parent
@@ -145,7 +147,7 @@ require.register = function(path, definition) {
  */
 
 require.relative = function(parent) {
-  var root = require.normalize(parent, '..');
+  var p = require.normalize(parent, '..');
 
   /**
    * lastIndexOf helper.
@@ -175,7 +177,15 @@ require.relative = function(parent) {
   localRequire.resolve = function(path) {
     var c = path.charAt(0);
     if ('/' == c) return path.slice(1);
-    if ('.' == c) return require.normalize(root, path);
+    if ('.' == c) return require.normalize(p, path);
+
+    // resolve deps by returning
+    // the dep in the nearest "deps"
+    // directory
+    var segs = parent.split('/');
+    var i = lastIndexOf(segs, 'deps') + 1;
+    if (!i) i = 0;
+    path = segs.slice(0, i + 1).join('/') + '/deps/' + path;
     return path;
   };
 
@@ -250,7 +260,6 @@ var bind = window.addEventListener ? 'addEventListener' : 'attachEvent',
 
 exports.bind = function(el, type, fn, capture){
   el[bind](prefix + type, fn, capture || false);
-
   return fn;
 };
 
@@ -267,7 +276,6 @@ exports.bind = function(el, type, fn, capture){
 
 exports.unbind = function(el, type, fn, capture){
   el[unbind](prefix + type, fn, capture || false);
-
   return fn;
 };
 });
@@ -300,7 +308,7 @@ require.register("component-matches-selector/index.js", function(exports, requir
  * Module dependencies.
  */
 
-var query = require("component-query");
+var query = require('query');
 
 /**
  * Element prototype.
@@ -344,7 +352,7 @@ function match(el, selector) {
 
 });
 require.register("discore-closest/index.js", function(exports, require, module){
-var matches = require("component-matches-selector")
+var matches = require('matches-selector')
 
 module.exports = function (element, selector, checkYoSelf, root) {
   element = checkYoSelf ? {parentNode: element} : element
@@ -369,8 +377,8 @@ require.register("component-delegate/index.js", function(exports, require, modul
  * Module dependencies.
  */
 
-var closest = require("discore-closest")
-  , event = require("component-event");
+var closest = require('closest')
+  , event = require('event');
 
 /**
  * Delegate event `type` to `selector`
@@ -415,8 +423,8 @@ require.register("component-events/index.js", function(exports, require, module)
  * Module dependencies.
  */
 
-var events = require("component-event");
-var delegate = require("component-delegate");
+var events = require('event');
+var delegate = require('delegate');
 
 /**
  * Expose `Events`.
@@ -794,8 +802,8 @@ require.register("visionmedia-superagent/lib/client.js", function(exports, requi
  * Module dependencies.
  */
 
-var Emitter = require("component-emitter");
-var reduce = require("component-reduce");
+var Emitter = require('emitter');
+var reduce = require('reduce');
 
 /**
  * Root reference for iframes.
@@ -1786,7 +1794,6 @@ request.put = function(url, data, fn){
 module.exports = request;
 
 });
-require.main("visionmedia-superagent", "lib/client.js")
 require.register("wout-svg.js/dist/svg.js", function(exports, require, module){
 /* svg.js v1.0rc2-15-g3754d89 - svg regex default color array pointarray patharray number viewbox bbox rbox element parent container fx relative event defs group arrange mask clip gradient doc shape use rect ellipse line poly path image text textpath nested hyperlink sugar set data memory loader - svgjs.com/license */
 ;(function() {
@@ -5322,7 +5329,6 @@ require.register("wout-svg.js/dist/svg.js", function(exports, require, module){
 }).call(this);
 
 });
-require.main("wout-svg.js", "dist/svg.js")
 require.register("component-inherit/index.js", function(exports, require, module){
 
 module.exports = function(a, b){
@@ -5347,7 +5353,7 @@ require.register("tower-emitter/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var index = require("component-indexof");
+var index = require('indexof');
 var slice = [].slice;
 
 /**
@@ -5515,9 +5521,9 @@ require.register("tower-type/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var Emitter = require("tower-emitter");
-var validator = require("tower-validator");
-var types = require("./lib/types");
+var Emitter = require('tower-emitter');
+var validator = require('tower-validator');
+var types = require('./lib/types');
 
 /**
  * Expose `type`.
@@ -5762,7 +5768,7 @@ require.register("tower-type/lib/types.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var isArray = require("part-is-array");
+var isArray = require('part-is-array');
 
 /**
  * Expose `types`.
@@ -5866,11 +5872,11 @@ require.register("tower-param/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var Emitter = require("tower-emitter");
-var validator = require("tower-validator");
-var type = require("tower-type");
-var isArray = require("part-is-array");
-var validators = require("./lib/validators");
+var Emitter = require('tower-emitter');
+var validator = require('tower-validator');
+var type = require('tower-type');
+var isArray = require('part-is-array');
+var validators = require('./lib/validators');
 
 /**
  * Expose `param`.
@@ -6035,7 +6041,7 @@ require.register("tower-param/lib/validators.js", function(exports, require, mod
  * Module dependencies.
  */
 
-var validator = require("tower-validator");
+var validator = require('tower-validator');
 
 /**
  * Expose `validators`.
@@ -6077,10 +6083,10 @@ require.register("tower-stream/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var load = require("tower-load");
-var proto = require("./lib/proto");
-var statics = require("./lib/static");
-var api = require("./lib/api");
+var load = require('tower-load');
+var proto = require('./lib/proto');
+var statics = require('./lib/static');
+var api = require('./lib/api');
 
 /**
  * Expose `stream`.
@@ -6197,8 +6203,8 @@ require.register("tower-stream/lib/static.js", function(exports, require, module
  * Module dependencies.
  */
 
-var Param = require("tower-param").Param;
-var Attr = require("tower-attr").Attr;
+var Param = require('tower-param').Param;
+var Attr = require('tower-attr').Attr;
 
 /**
  * Instantiate a new `Stream`.
@@ -6359,7 +6365,7 @@ require.register("tower-stream/lib/api.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var Emitter = require("tower-emitter");
+var Emitter = require('tower-emitter');
 
 /**
  * Expose `constructorFn`
@@ -6545,12 +6551,12 @@ require.register("tower-attr/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var validator = require("tower-validator").ns('attr');
-var types = require("tower-type");
-var kindof = 'undefined' === typeof window ? require("type-component") : require("tower-type");
-var each = require("part-async-series");
-var isBlank = require("part-is-blank");
-var validators = require("./lib/validators");
+var validator = require('tower-validator').ns('attr');
+var types = require('tower-type');
+var kindof = 'undefined' === typeof window ? require('type-component') : require('type');
+var each = require('part-async-series');
+var isBlank = require('part-is-blank');
+var validators = require('./lib/validators');
 
 /**
  * Expose `attr`.
@@ -6743,7 +6749,7 @@ require.register("tower-attr/lib/validators.js", function(exports, require, modu
  * Module dependencies.
  */
 
-var validator = require("tower-validator");
+var validator = require('tower-validator');
 
 /**
  * Expose `validators`.
@@ -6798,8 +6804,8 @@ require.register("tower-validator/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var Emitter = require("tower-emitter");
-var validators = require("./lib/validators");
+var Emitter = require('tower-emitter');
+var validators = require('./lib/validators');
 
 /**
  * Expose `validator`.
@@ -6893,7 +6899,7 @@ require.register("tower-validator/lib/validators.js", function(exports, require,
  * Module dependencies.
  */
 
-var indexof = require("component-indexof");
+var indexof = require('indexof');
 
 /**
  * Expose `validators`.
@@ -7289,12 +7295,12 @@ require.register("tower-resource/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var Emitter = require("tower-emitter");
-var stream = require("tower-stream");
-var validator = require("tower-validator").ns('resource');
-var load = require("tower-load");
-var proto = require("./lib/proto");
-var statics = require("./lib/static");
+var Emitter = require('tower-emitter');
+var stream = require('tower-stream');
+var validator = require('tower-validator').ns('resource');
+var load = require('tower-load');
+var proto = require('./lib/proto');
+var statics = require('./lib/static');
 var slice = [].slice;
 
 /**
@@ -7489,11 +7495,11 @@ require.register("tower-resource/lib/static.js", function(exports, require, modu
  * Module dependencies.
  */
 
-var attr = require("tower-attr");
-var validator = require("tower-validator").ns('resource');
-var text = require("tower-text"); // XXX: rename `tower-text`?
-var query = require("tower-query");
-var series = require("part-async-series");
+var attr = require('tower-attr');
+var validator = require('tower-validator').ns('resource');
+var text = require('tower-text'); // XXX: rename `tower-text`?
+var query = require('tower-query');
+var series = require('part-async-series');
 
 text('resource.error', 'Resource validation failed');
 
@@ -7778,7 +7784,7 @@ exports.all = function(fn){
  */
 
 exports.load = function(data){
-  // XXX require("tower-memory-adapter").load(data);
+  // XXX require('tower-memory-adapter').load(data);
 };
 
 /**
@@ -7806,8 +7812,8 @@ require.register("tower-resource/lib/proto.js", function(exports, require, modul
  * Module dependencies.
  */
 
-var query = require("tower-query");
-var each = require("part-async-series");
+var query = require('tower-query');
+var each = require('part-async-series');
 
 /**
  * Save and invoke `fn(err)`.
@@ -8025,10 +8031,10 @@ require.register("tower-program/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var Emitter = require("tower-emitter");
-var stream = require("tower-stream").ns('program');
-var proto = require("./lib/proto");
-var statics = require("./lib/statics");
+var Emitter = require('tower-emitter');
+var stream = require('tower-stream').ns('program');
+var proto = require('./lib/proto');
+var statics = require('./lib/statics');
 
 /**
  * Expose `program`.
@@ -8177,13 +8183,13 @@ require.register("tower-query/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var each = require("part-each-array");
-var isArray = require("part-is-array");
-var Constraint = require("./lib/constraint");
-var validate = require("./lib/validate");
-var validateConstraints = require("./lib/validate-constraints");
-var filter = require("./lib/filter");
-var subscriber = require("./lib/subscriber");
+var each = require('part-each-array');
+var isArray = require('part-is-array');
+var Constraint = require('./lib/constraint');
+var validate = require('./lib/validate');
+var validateConstraints = require('./lib/validate-constraints');
+var filter = require('./lib/filter');
+var subscriber = require('./lib/subscriber');
 
 /**
  * Expose `query`.
@@ -8967,7 +8973,7 @@ require.register("tower-query/lib/validate-constraints.js", function(exports, re
  * Module dependencies.
  */
 
-var validator = require("tower-validator");
+var validator = require('tower-validator');
 
 /**
  * Expose `validate`.
@@ -9006,7 +9012,7 @@ require.register("tower-query/lib/filter.js", function(exports, require, module)
  * Module dependencies.
  */
 
-var validateConstraints = require("./validate-constraints");
+var validateConstraints = require('./validate-constraints');
 
 /**
  * Expose `filter`.
@@ -9046,7 +9052,7 @@ require.register("tower-query/lib/subscriber.js", function(exports, require, mod
  * Module dependencies.
  */
 
-var program = require("tower-program");
+var program = require('tower-program');
 
 /**
  * Expose `query-subscriber` program.
@@ -9075,12 +9081,12 @@ require.register("tower-adapter/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var Emitter = require("tower-emitter");
-var stream = require("tower-stream");
-var resource = require("tower-resource");
-var query = require("tower-query");
-var type = require("tower-type");
-var load = require("tower-load");
+var Emitter = require('tower-emitter');
+var stream = require('tower-stream');
+var resource = require('tower-resource');
+var query = require('tower-query');
+var type = require('tower-type');
+var load = require('tower-load');
 
 /**
  * Expose `adapter`.
@@ -9346,8 +9352,8 @@ require.register("openautomation/lib/rest.js", function(exports, require, module
  * Module dependencies.
  */
 
-var adapter = require("tower-adapter")('openautomation');
-var agent = require("visionmedia-superagent");
+var adapter = require('tower-adapter')('openautomation');
+var agent = require('superagent');
 
 /**
  * Map of model names to REST API names.
@@ -9459,9 +9465,9 @@ require.register("openautomation/lib/sprite.js", function(exports, require, modu
  * Module dependencies.
  */
 
-var events = require("component-events");
-var Emitter = require("component-emitter");
-var inherit = require("component-inherit");
+var events = require('events');
+var Emitter = require('emitter');
+var inherit = require('inherit');
 
 /**
  * Expose `Sprite`.
@@ -9520,8 +9526,8 @@ require.register("openautomation/lib/microplate.js", function(exports, require, 
  * Module dependencies.
  */
 
-var events = require("component-events");
-var Emitter = require("component-emitter");
+var events = require('events');
+var Emitter = require('emitter');
 
 /**
  * Expose `Microplate`.
@@ -9705,25 +9711,25 @@ require.register("openautomation/index.js", function(exports, require, module){
  * Module dependencies.
  */
 
-var adapter = require("./lib/rest");
-var query = require("tower-query");
+var adapter = require('./lib/rest');
+var query = require('tower-query');
 query.use(adapter);
-var resource = require("tower-resource");
-var getUserMedia = require("juliangruber-get-user-media");
-var canvasPosition = require("brighthas-window2canvas");
-var transformBounds = require("intron-transform-bounds");
-var events = require("component-event");
-var agent = require("visionmedia-superagent");
-var SVG = require("wout-svg.js").SVG;
+var resource = require('tower-resource');
+var getUserMedia = require('get-user-media');
+var canvasPosition = require('window2canvas');
+var transformBounds = require('transform-bounds');
+var events = require('event');
+var agent = require('superagent');
+var SVG = require('svg.js').SVG;
 var drawing = SVG('sprites').fixSubPixelOffset();
 
 /**
  * Lab equipment.
  */
 
-var Microplate = require("./lib/microplate");
-var LiquidContainer = require("./lib/liquid-container");
-var PetriDish = require("./lib/petri-dish");
+var Microplate = require('./lib/microplate');
+var LiquidContainer = require('./lib/liquid-container');
+var PetriDish = require('./lib/petri-dish');
 
 /**
  * Canvas.
@@ -9890,3 +9896,975 @@ function tick() {
 
 
 
+
+require.alias("juliangruber-get-user-media/index.js", "openautomation/deps/get-user-media/index.js");
+require.alias("juliangruber-get-user-media/index.js", "openautomation/deps/get-user-media/index.js");
+require.alias("juliangruber-get-user-media/index.js", "get-user-media/index.js");
+require.alias("juliangruber-get-user-media/index.js", "juliangruber-get-user-media/index.js");
+require.alias("brighthas-window2canvas/index.js", "openautomation/deps/window2canvas/index.js");
+require.alias("brighthas-window2canvas/index.js", "openautomation/deps/window2canvas/index.js");
+require.alias("brighthas-window2canvas/index.js", "window2canvas/index.js");
+require.alias("brighthas-window2canvas/index.js", "brighthas-window2canvas/index.js");
+require.alias("component-event/index.js", "openautomation/deps/event/index.js");
+require.alias("component-event/index.js", "event/index.js");
+
+require.alias("component-events/index.js", "openautomation/deps/events/index.js");
+require.alias("component-events/index.js", "events/index.js");
+require.alias("component-event/index.js", "component-events/deps/event/index.js");
+
+require.alias("component-delegate/index.js", "component-events/deps/delegate/index.js");
+require.alias("discore-closest/index.js", "component-delegate/deps/closest/index.js");
+require.alias("discore-closest/index.js", "component-delegate/deps/closest/index.js");
+require.alias("component-matches-selector/index.js", "discore-closest/deps/matches-selector/index.js");
+require.alias("component-query/index.js", "component-matches-selector/deps/query/index.js");
+
+require.alias("discore-closest/index.js", "discore-closest/index.js");
+require.alias("component-event/index.js", "component-delegate/deps/event/index.js");
+
+require.alias("component-emitter/index.js", "openautomation/deps/emitter/index.js");
+require.alias("component-emitter/index.js", "emitter/index.js");
+
+require.alias("intron-transform-bounds/index.js", "openautomation/deps/transform-bounds/index.js");
+require.alias("intron-transform-bounds/index.js", "transform-bounds/index.js");
+
+require.alias("visionmedia-superagent/lib/client.js", "openautomation/deps/superagent/lib/client.js");
+require.alias("visionmedia-superagent/lib/client.js", "openautomation/deps/superagent/index.js");
+require.alias("visionmedia-superagent/lib/client.js", "superagent/index.js");
+require.alias("component-emitter/index.js", "visionmedia-superagent/deps/emitter/index.js");
+
+require.alias("component-reduce/index.js", "visionmedia-superagent/deps/reduce/index.js");
+
+require.alias("visionmedia-superagent/lib/client.js", "visionmedia-superagent/index.js");
+require.alias("wout-svg.js/dist/svg.js", "openautomation/deps/svg.js/dist/svg.js");
+require.alias("wout-svg.js/dist/svg.js", "openautomation/deps/svg.js/index.js");
+require.alias("wout-svg.js/dist/svg.js", "svg.js/index.js");
+require.alias("wout-svg.js/dist/svg.js", "wout-svg.js/index.js");
+require.alias("component-inherit/index.js", "openautomation/deps/inherit/index.js");
+require.alias("component-inherit/index.js", "inherit/index.js");
+
+require.alias("tower-resource/index.js", "openautomation/deps/tower-resource/index.js");
+require.alias("tower-resource/lib/static.js", "openautomation/deps/tower-resource/lib/static.js");
+require.alias("tower-resource/lib/proto.js", "openautomation/deps/tower-resource/lib/proto.js");
+require.alias("tower-resource/index.js", "openautomation/deps/tower-resource/index.js");
+require.alias("tower-resource/index.js", "tower-resource/index.js");
+require.alias("tower-emitter/index.js", "tower-resource/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-resource/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-stream/index.js", "tower-resource/deps/tower-stream/index.js");
+require.alias("tower-stream/lib/static.js", "tower-resource/deps/tower-stream/lib/static.js");
+require.alias("tower-stream/lib/proto.js", "tower-resource/deps/tower-stream/lib/proto.js");
+require.alias("tower-stream/lib/api.js", "tower-resource/deps/tower-stream/lib/api.js");
+require.alias("tower-stream/index.js", "tower-resource/deps/tower-stream/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-param/index.js", "tower-stream/deps/tower-param/index.js");
+require.alias("tower-param/lib/validators.js", "tower-stream/deps/tower-param/lib/validators.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-param/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-param/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-param/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-param/deps/part-is-array/index.js");
+
+require.alias("tower-attr/index.js", "tower-stream/deps/tower-attr/index.js");
+require.alias("tower-attr/lib/validators.js", "tower-stream/deps/tower-attr/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
+
+require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
+
+require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
+
+require.alias("tower-load/index.js", "tower-stream/deps/tower-load/index.js");
+
+require.alias("tower-stream/index.js", "tower-stream/index.js");
+require.alias("tower-query/index.js", "tower-resource/deps/tower-query/index.js");
+require.alias("tower-query/lib/constraint.js", "tower-resource/deps/tower-query/lib/constraint.js");
+require.alias("tower-query/lib/validate.js", "tower-resource/deps/tower-query/lib/validate.js");
+require.alias("tower-query/lib/validate-constraints.js", "tower-resource/deps/tower-query/lib/validate-constraints.js");
+require.alias("tower-query/lib/filter.js", "tower-resource/deps/tower-query/lib/filter.js");
+require.alias("tower-query/lib/subscriber.js", "tower-resource/deps/tower-query/lib/subscriber.js");
+require.alias("tower-validator/index.js", "tower-query/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-query/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-query/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-program/index.js", "tower-query/deps/tower-program/index.js");
+require.alias("tower-program/lib/proto.js", "tower-query/deps/tower-program/lib/proto.js");
+require.alias("tower-program/lib/statics.js", "tower-query/deps/tower-program/lib/statics.js");
+require.alias("tower-emitter/index.js", "tower-program/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-program/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-stream/index.js", "tower-program/deps/tower-stream/index.js");
+require.alias("tower-stream/lib/static.js", "tower-program/deps/tower-stream/lib/static.js");
+require.alias("tower-stream/lib/proto.js", "tower-program/deps/tower-stream/lib/proto.js");
+require.alias("tower-stream/lib/api.js", "tower-program/deps/tower-stream/lib/api.js");
+require.alias("tower-stream/index.js", "tower-program/deps/tower-stream/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-param/index.js", "tower-stream/deps/tower-param/index.js");
+require.alias("tower-param/lib/validators.js", "tower-stream/deps/tower-param/lib/validators.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-param/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-param/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-param/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-param/deps/part-is-array/index.js");
+
+require.alias("tower-attr/index.js", "tower-stream/deps/tower-attr/index.js");
+require.alias("tower-attr/lib/validators.js", "tower-stream/deps/tower-attr/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
+
+require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
+
+require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
+
+require.alias("tower-load/index.js", "tower-stream/deps/tower-load/index.js");
+
+require.alias("tower-stream/index.js", "tower-stream/index.js");
+require.alias("part-each-array/index.js", "tower-query/deps/part-each-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-query/deps/part-is-array/index.js");
+
+require.alias("tower-attr/index.js", "tower-resource/deps/tower-attr/index.js");
+require.alias("tower-attr/lib/validators.js", "tower-resource/deps/tower-attr/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
+
+require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
+
+require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
+
+require.alias("tower-validator/index.js", "tower-resource/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-resource/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-resource/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-text/index.js", "tower-resource/deps/tower-text/index.js");
+require.alias("tower-text/index.js", "tower-resource/deps/tower-text/index.js");
+require.alias("tower-text/index.js", "tower-text/index.js");
+require.alias("tower-load/index.js", "tower-resource/deps/tower-load/index.js");
+
+require.alias("part-async-series/index.js", "tower-resource/deps/part-async-series/index.js");
+
+require.alias("tower-resource/index.js", "tower-resource/index.js");
+require.alias("tower-query/index.js", "openautomation/deps/tower-query/index.js");
+require.alias("tower-query/lib/constraint.js", "openautomation/deps/tower-query/lib/constraint.js");
+require.alias("tower-query/lib/validate.js", "openautomation/deps/tower-query/lib/validate.js");
+require.alias("tower-query/lib/validate-constraints.js", "openautomation/deps/tower-query/lib/validate-constraints.js");
+require.alias("tower-query/lib/filter.js", "openautomation/deps/tower-query/lib/filter.js");
+require.alias("tower-query/lib/subscriber.js", "openautomation/deps/tower-query/lib/subscriber.js");
+require.alias("tower-query/index.js", "tower-query/index.js");
+require.alias("tower-validator/index.js", "tower-query/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-query/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-query/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-program/index.js", "tower-query/deps/tower-program/index.js");
+require.alias("tower-program/lib/proto.js", "tower-query/deps/tower-program/lib/proto.js");
+require.alias("tower-program/lib/statics.js", "tower-query/deps/tower-program/lib/statics.js");
+require.alias("tower-emitter/index.js", "tower-program/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-program/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-stream/index.js", "tower-program/deps/tower-stream/index.js");
+require.alias("tower-stream/lib/static.js", "tower-program/deps/tower-stream/lib/static.js");
+require.alias("tower-stream/lib/proto.js", "tower-program/deps/tower-stream/lib/proto.js");
+require.alias("tower-stream/lib/api.js", "tower-program/deps/tower-stream/lib/api.js");
+require.alias("tower-stream/index.js", "tower-program/deps/tower-stream/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-param/index.js", "tower-stream/deps/tower-param/index.js");
+require.alias("tower-param/lib/validators.js", "tower-stream/deps/tower-param/lib/validators.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-param/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-param/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-param/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-param/deps/part-is-array/index.js");
+
+require.alias("tower-attr/index.js", "tower-stream/deps/tower-attr/index.js");
+require.alias("tower-attr/lib/validators.js", "tower-stream/deps/tower-attr/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
+
+require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
+
+require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
+
+require.alias("tower-load/index.js", "tower-stream/deps/tower-load/index.js");
+
+require.alias("tower-stream/index.js", "tower-stream/index.js");
+require.alias("part-each-array/index.js", "tower-query/deps/part-each-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-query/deps/part-is-array/index.js");
+
+require.alias("tower-adapter/index.js", "openautomation/deps/tower-adapter/index.js");
+require.alias("tower-adapter/index.js", "tower-adapter/index.js");
+require.alias("tower-emitter/index.js", "tower-adapter/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-adapter/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-stream/index.js", "tower-adapter/deps/tower-stream/index.js");
+require.alias("tower-stream/lib/static.js", "tower-adapter/deps/tower-stream/lib/static.js");
+require.alias("tower-stream/lib/proto.js", "tower-adapter/deps/tower-stream/lib/proto.js");
+require.alias("tower-stream/lib/api.js", "tower-adapter/deps/tower-stream/lib/api.js");
+require.alias("tower-stream/index.js", "tower-adapter/deps/tower-stream/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-param/index.js", "tower-stream/deps/tower-param/index.js");
+require.alias("tower-param/lib/validators.js", "tower-stream/deps/tower-param/lib/validators.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-param/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-param/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-param/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-param/deps/part-is-array/index.js");
+
+require.alias("tower-attr/index.js", "tower-stream/deps/tower-attr/index.js");
+require.alias("tower-attr/lib/validators.js", "tower-stream/deps/tower-attr/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
+
+require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
+
+require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
+
+require.alias("tower-load/index.js", "tower-stream/deps/tower-load/index.js");
+
+require.alias("tower-stream/index.js", "tower-stream/index.js");
+require.alias("tower-query/index.js", "tower-adapter/deps/tower-query/index.js");
+require.alias("tower-query/lib/constraint.js", "tower-adapter/deps/tower-query/lib/constraint.js");
+require.alias("tower-query/lib/validate.js", "tower-adapter/deps/tower-query/lib/validate.js");
+require.alias("tower-query/lib/validate-constraints.js", "tower-adapter/deps/tower-query/lib/validate-constraints.js");
+require.alias("tower-query/lib/filter.js", "tower-adapter/deps/tower-query/lib/filter.js");
+require.alias("tower-query/lib/subscriber.js", "tower-adapter/deps/tower-query/lib/subscriber.js");
+require.alias("tower-validator/index.js", "tower-query/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-query/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-query/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-program/index.js", "tower-query/deps/tower-program/index.js");
+require.alias("tower-program/lib/proto.js", "tower-query/deps/tower-program/lib/proto.js");
+require.alias("tower-program/lib/statics.js", "tower-query/deps/tower-program/lib/statics.js");
+require.alias("tower-emitter/index.js", "tower-program/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-program/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-stream/index.js", "tower-program/deps/tower-stream/index.js");
+require.alias("tower-stream/lib/static.js", "tower-program/deps/tower-stream/lib/static.js");
+require.alias("tower-stream/lib/proto.js", "tower-program/deps/tower-stream/lib/proto.js");
+require.alias("tower-stream/lib/api.js", "tower-program/deps/tower-stream/lib/api.js");
+require.alias("tower-stream/index.js", "tower-program/deps/tower-stream/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-param/index.js", "tower-stream/deps/tower-param/index.js");
+require.alias("tower-param/lib/validators.js", "tower-stream/deps/tower-param/lib/validators.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-param/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-param/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-param/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-param/deps/part-is-array/index.js");
+
+require.alias("tower-attr/index.js", "tower-stream/deps/tower-attr/index.js");
+require.alias("tower-attr/lib/validators.js", "tower-stream/deps/tower-attr/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
+
+require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
+
+require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
+
+require.alias("tower-load/index.js", "tower-stream/deps/tower-load/index.js");
+
+require.alias("tower-stream/index.js", "tower-stream/index.js");
+require.alias("part-each-array/index.js", "tower-query/deps/part-each-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-query/deps/part-is-array/index.js");
+
+require.alias("tower-resource/index.js", "tower-adapter/deps/tower-resource/index.js");
+require.alias("tower-resource/lib/static.js", "tower-adapter/deps/tower-resource/lib/static.js");
+require.alias("tower-resource/lib/proto.js", "tower-adapter/deps/tower-resource/lib/proto.js");
+require.alias("tower-resource/index.js", "tower-adapter/deps/tower-resource/index.js");
+require.alias("tower-emitter/index.js", "tower-resource/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-resource/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-stream/index.js", "tower-resource/deps/tower-stream/index.js");
+require.alias("tower-stream/lib/static.js", "tower-resource/deps/tower-stream/lib/static.js");
+require.alias("tower-stream/lib/proto.js", "tower-resource/deps/tower-stream/lib/proto.js");
+require.alias("tower-stream/lib/api.js", "tower-resource/deps/tower-stream/lib/api.js");
+require.alias("tower-stream/index.js", "tower-resource/deps/tower-stream/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-param/index.js", "tower-stream/deps/tower-param/index.js");
+require.alias("tower-param/lib/validators.js", "tower-stream/deps/tower-param/lib/validators.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-param/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-param/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-param/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-param/deps/part-is-array/index.js");
+
+require.alias("tower-attr/index.js", "tower-stream/deps/tower-attr/index.js");
+require.alias("tower-attr/lib/validators.js", "tower-stream/deps/tower-attr/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
+
+require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
+
+require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
+
+require.alias("tower-load/index.js", "tower-stream/deps/tower-load/index.js");
+
+require.alias("tower-stream/index.js", "tower-stream/index.js");
+require.alias("tower-query/index.js", "tower-resource/deps/tower-query/index.js");
+require.alias("tower-query/lib/constraint.js", "tower-resource/deps/tower-query/lib/constraint.js");
+require.alias("tower-query/lib/validate.js", "tower-resource/deps/tower-query/lib/validate.js");
+require.alias("tower-query/lib/validate-constraints.js", "tower-resource/deps/tower-query/lib/validate-constraints.js");
+require.alias("tower-query/lib/filter.js", "tower-resource/deps/tower-query/lib/filter.js");
+require.alias("tower-query/lib/subscriber.js", "tower-resource/deps/tower-query/lib/subscriber.js");
+require.alias("tower-validator/index.js", "tower-query/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-query/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-query/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-program/index.js", "tower-query/deps/tower-program/index.js");
+require.alias("tower-program/lib/proto.js", "tower-query/deps/tower-program/lib/proto.js");
+require.alias("tower-program/lib/statics.js", "tower-query/deps/tower-program/lib/statics.js");
+require.alias("tower-emitter/index.js", "tower-program/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-program/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-stream/index.js", "tower-program/deps/tower-stream/index.js");
+require.alias("tower-stream/lib/static.js", "tower-program/deps/tower-stream/lib/static.js");
+require.alias("tower-stream/lib/proto.js", "tower-program/deps/tower-stream/lib/proto.js");
+require.alias("tower-stream/lib/api.js", "tower-program/deps/tower-stream/lib/api.js");
+require.alias("tower-stream/index.js", "tower-program/deps/tower-stream/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-stream/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-param/index.js", "tower-stream/deps/tower-param/index.js");
+require.alias("tower-param/lib/validators.js", "tower-stream/deps/tower-param/lib/validators.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-param/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-param/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-param/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-param/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-param/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-param/deps/part-is-array/index.js");
+
+require.alias("tower-attr/index.js", "tower-stream/deps/tower-attr/index.js");
+require.alias("tower-attr/lib/validators.js", "tower-stream/deps/tower-attr/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
+
+require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
+
+require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
+
+require.alias("tower-load/index.js", "tower-stream/deps/tower-load/index.js");
+
+require.alias("tower-stream/index.js", "tower-stream/index.js");
+require.alias("part-each-array/index.js", "tower-query/deps/part-each-array/index.js");
+
+require.alias("part-is-array/index.js", "tower-query/deps/part-is-array/index.js");
+
+require.alias("tower-attr/index.js", "tower-resource/deps/tower-attr/index.js");
+require.alias("tower-attr/lib/validators.js", "tower-resource/deps/tower-attr/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
+
+require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
+
+require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
+
+require.alias("tower-validator/index.js", "tower-resource/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-resource/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-resource/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("tower-text/index.js", "tower-resource/deps/tower-text/index.js");
+require.alias("tower-text/index.js", "tower-resource/deps/tower-text/index.js");
+require.alias("tower-text/index.js", "tower-text/index.js");
+require.alias("tower-load/index.js", "tower-resource/deps/tower-load/index.js");
+
+require.alias("part-async-series/index.js", "tower-resource/deps/part-async-series/index.js");
+
+require.alias("tower-resource/index.js", "tower-resource/index.js");
+require.alias("tower-type/index.js", "tower-adapter/deps/tower-type/index.js");
+require.alias("tower-type/lib/types.js", "tower-adapter/deps/tower-type/lib/types.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
+require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
+require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
+require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
+
+require.alias("tower-emitter/index.js", "tower-emitter/index.js");
+require.alias("tower-validator/index.js", "tower-validator/index.js");
+require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
+
+require.alias("tower-load/index.js", "tower-adapter/deps/tower-load/index.js");
+
+require.alias("openautomation/index.js", "openautomation/index.js");
