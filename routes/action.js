@@ -16,7 +16,7 @@ exports.create = function(req, res){
 
   console.log(action);
 
-  grbl(function(machine) {
+  grbl(function(machine){
     machine.write(movement(10, 0, 0));
   });
 
