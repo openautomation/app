@@ -3,7 +3,9 @@
  * Module dependencies.
  */
 
-var move = require('../lib/xyz_sender');
+//var move = require('../lib/grbl-gantry/gantry');
+var grbl = require('grbl');
+var fs = require('fs');
 
 /**
  * Execute an action.
@@ -12,11 +14,19 @@ var move = require('../lib/xyz_sender');
 exports.create = function(req, res){
   var action = req.body;
 
-  move(10, 10);
   console.log(action);
+
+  grbl(function(machine) {
+    machine.write(movement(10, 0, 0));
+  });
+
   // XXX: should call ROS script
   res.json(action);
 };
+
+function movement(x, y, z) {
+  return ["G1", x, y, z, "f10000", "\n"].join(" ");
+}
 
 //var xmlrpc = require('xmlrpc')
 //var server = xmlrpc.createServer({ host: '192.168.0.20', port: 11311 });
@@ -38,3 +48,16 @@ exports.create = function(req, res){
 // socket.write(msg);
 
 // http://wiki.ros.org/ROS/Connection%20Header
+
+grbl(function(machine) {
+        console.log("configuring grbl...");
+
+        machine.write("$X\n");
+        machine.write("G91\n");
+	//machine.write("G92 x0 y0 z0\n");
+
+        machine.write("", function() {
+            console.log("done!");
+            machine.end();
+	});
+});
