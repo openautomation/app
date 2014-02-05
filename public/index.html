@@ -2,16 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <link href="/stylesheets/build.css" rel="stylesheet"></link>
   </head>
   <body>
-    <video id="webcam" width="640" height="480" style="display:none;"></video>
+    <div class="container">
+      <div class="sidebar">
+        <ol class="steps">
+          <li contenteditable>Add 10ml Liquid A to each well</li>
+        </ol>
+      </div>
+      <div class="content">
+        <video id="webcam" width="640" height="480" style="display:none;"></video>
 
-    <div style=" width:640px;height:480px;margin: 10px auto;">
-      <canvas id="canvas" width="640" height="480" style="position: absolute"></canvas>
-      <div id="sprites" style="width: 640, height: 480, position: absolute"></div>
+        <div style=" width:640px;height:480px;margin: 10px auto;">
+          <canvas id="canvas" width="640" height="480" style="position: absolute"></canvas>
+          <div id="sprites" style="width: 640, height: 480, position: absolute"></div>
+        </div>
+        <div id="log"></div>
+      </div>
     </div>
-
-    <div id="log"></div>
 
     <script src="/javascripts/jsfeat.js"></script>
     <script src="/javascripts/build.js"></script>
