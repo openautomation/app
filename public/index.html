@@ -5,10 +5,21 @@
     <link href="/stylesheets/build.css" rel="stylesheet"></link>
   </head>
   <body>
+    <style>
+    .step {
+      padding: 10px 15px;
+    }
+
+    .step:focus {
+      outline: 0;
+    }
+
+    </style>
     <div class="container">
       <div class="sidebar">
         <ol class="steps">
-          <li contenteditable>Add 10ml Liquid A to each well</li>
+          <li class="step" contenteditable>Add 10ml Liquid A to each well</li>
+          <li class="step" contenteditable>Incubate microplate at 37C for 15min</li>
         </ol>
       </div>
       <div class="content">
