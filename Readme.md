@@ -4,6 +4,8 @@
 
 Make sure you have XCode and XCode Developer Tools installed if you're on a mac, along with git and node.js.
 
+Make sure you have node 0.11.x installed. If you want to manage multiple versions of node, I recommend https://github.com/visionmedia/n.
+
 Then install component:
 
 ```

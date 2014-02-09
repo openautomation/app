@@ -1,8 +1,15 @@
 
 /**
+ * Module dependencies.
+ */
+
+var views = require('co-views');
+var render = views(__dirname + '/../public', { map: { html: 'swig' } });
+
+/**
  * GET home page.
  */
 
-exports.index = function(req, res){
-  res.render('index', { title: 'Express' });
+module.exports = function *(){
+  this.body = yield render('index.html', { title: 'iorobotics' });
 };

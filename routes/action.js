@@ -11,8 +11,8 @@ var fs = require('fs');
  * Execute an action.
  */
 
-exports.create = function(req, res){
-  var action = req.body;
+exports.create = function *(){
+  var action = this.body;
 
   console.log(action);
 
@@ -21,7 +21,7 @@ exports.create = function(req, res){
   });
 
   // XXX: should call ROS script
-  res.json(action);
+  this.json(action);
 };
 
 function movement(x, y, z) {
