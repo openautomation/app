@@ -35,6 +35,7 @@
     "lib/microplate.js",
     "lib/liquid-container.js",
     "lib/petri-dish.js",
+    "lib/steps.js",
     "index.js"
   ],
   "styles": [

@@ -36,12 +36,25 @@ content('root')
     
   });
 
+var steps = ['Incubate microplate at 37C for 15min'];
+var parser = require('./lib/steps');
+parser.use(/(\w+)\s(\w+)[^\d]+(\d+C)[^\d]+(\d+min)/, function(_, action, object, temperature, duration){
+  return {
+    action: action, 
+    object: object, 
+    temperature: temperature,
+    duration: duration
+  }
+});
+
+console.log(parser(steps[0]));
+
 /**
  * Template.
  */
 
 template(document.body)({
-  steps: ['Incubate microplate at 37C for 15min']
+  steps: steps
 });
 
 /**
