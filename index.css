@@ -24,7 +24,6 @@ a, span, p, input, label, button {
 }
 
 ul {
-  list-style: none;
   padding: 0px;
   margin: 0px;
 }
@@ -49,15 +48,12 @@ ul {
 }
 
 .steps {
-  list-style: none;
-  padding: 0px;
   position: relative;
-  margin: 0px;
+  display: block;
 }
 
 .sidebar-content {
   width: 100%;
-  padding: 10px;
   /*align-items: stretch;*/
 }
 
@@ -86,7 +82,7 @@ input {
 
 .content {
   position: relative;
-  margin-left: 250px;
+  margin-left: 320px;
   height: 100%;
 }
 
@@ -99,9 +95,9 @@ input {
 }
 
 .content li {
-  width: 30.3333%;
+  /*width: 30.3333%;
   margin: 0 1.5% 3% 1.5%;
-  padding-bottom: 29.333%;
+  padding-bottom: 29.333%;*/
   position: relative;
   float: left;
   -webkit-user-select: none;
@@ -123,20 +119,35 @@ input {
   border: 3px solid #333;
 }
 
+.steps {
+  margin: 0px;
+  list-style-type: none;
+  padding: 0px;
+  padding-top: 20px;
+  border: none;
+}
+
 .step {
-  padding: 5px 15px;
-  font-size: 11px;
+  padding: 6px 18px;
+  font-size: 12px;
   color: hsl(0, 0%, 99%);
   position: relative;
+  margin: 0px 13px;
+  border-left: 1px solid hsl(0, 0%, 25%);
 }
 
 .step:focus {
   outline: 0;
 }
 
+.step.plain {
+  color: hsl(0, 0%, 60%);
+}
+
 .step-measurement, .step-liquid {
-  border-bottom-style: dotted;
-  border-bottom-width: 1px;
+  /*border-bottom-style: dotted;
+  border-bottom-width: 1px;*/
+  color: hsl(0, 0%, 99%%);
 }
 
 .step-status {
@@ -151,11 +162,41 @@ input {
   align-items: center;
 }
 
+.step-title {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.step-details {
+  font-size: 8px;
+  color: hsl(0, 0%, 65%);
+}
+
+.step i {
+  color: hsl(0, 0%, 40%);
+  position: absolute;
+  top: 7px;
+}
+
+.step i.first {
+  left: -5px;
+}
+
+.step i.last {
+  right: 5px;
+  color: hsl(134, 44%, 44%);
+}
+
 .sidebar-button {
   text-decoration: none;
   color: hsl(0, 0%, 99%);
-  border: 1px solid hsl(0, 0%, 23%);
+  border: 1px solid hsl(0, 0%, 25%);
+  margin: 13px;
   padding: 8px 15px;
   display: block;
-  width: 100px;
+  position: relative;
+  right: 0px;
+  text-align: center;
+  background: hsl(0, 0%, 27%);
+  color: hsl(0, 0%, 70%);
 }

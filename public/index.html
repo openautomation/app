@@ -3,16 +3,43 @@
   <head>
     <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
     <link href="/stylesheets/build.css" rel="stylesheet"></link>
   </head>
   <body>
     <div class="container">
       <div class="sidebar">
         <div class="sidebar-content">
-          <ol class="steps">
-            <li class="step" contenteditable>Add <span class="step-measurement">10ml</span> <span class="step-liquid">Liquid A</span> to each well<span class="step-status"></span></li>
-            <li class="step" contenteditable data-each="step in steps"><span data-text="step"></span></li>
-          </ol>
+          <ul class="steps">
+            <li class="step" contenteditable>
+              <i class="first fa fa-dot-circle-o"></i>
+              <div class="step-title">Add sample to each microplate well</div>
+              <span class="step-details">Liquid A, 10ml each well</span>
+              <i class="last fa fa-adjust"></i>
+            </li>
+            <li class="step" contenteditable>
+              <i class="first fa fa-dot-circle-o"></i>
+              <div class="step-title">Incubate microplate</div>
+              <span class="step-details">37C, 60min</span>
+            </li>
+            <li class="step" contenteditable>
+              <i class="first fa fa-dot-circle-o"></i>
+              <div class="step-title">Discard solution in each well</div>
+              <span class="step-details">Decant</span>
+            </li>
+            <li class="step" contenteditable>
+              <i class="first fa fa-dot-circle-o"></i>
+              <div class="step-title">Wash each microplate well</div>
+              <span class="step-details">4x</span>
+            </li>
+            <li class="step" contenteditable>
+              <i class="first fa fa-dot-circle-o"></i>
+              <div class="step-title">Add sample to wells</div>
+              <div class="step-details">Liquid A</div>
+              <div class="step-details">10ml each well</div>
+            </li>
+            <!--<li class="step" contenteditable data-each="step in steps"><span data-text="step"></span></li>-->
+          </ul>
 
           <a class="sidebar-button" on-click="run()">Run</a>
         </div>

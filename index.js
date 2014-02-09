@@ -36,7 +36,35 @@ content('root')
     
   });
 
-var steps = ['Incubate microplate at 37C for 15min'];
+/**
+ * Add :volume of :solution to :containers
+  - Incubate :container at :temperature for :duration
+  - Measure :property at :constraints (Read absorbance...)
+  - Discard :solution from :containers
+ */
+/**
+ * 
+ */
+var steps = [
+  'Add 100ul of negative or positive control or sample to each well',
+  'Incubate the plate at 37C for 60min',
+  'Discard the solution in each well (aspirating or decanting)',
+  'Repeat 4-6 times (this is a "wash" recipe):',
+  '  - Add 200-300ul washing buffer to each well',
+  '  - Discard solution in each well',
+  'Aspirate or decant each well to ensure no fluid',
+  'Invert plate and blot on paper towel',
+  'Add 100ul Enzyme Conjugate to each well',
+  'Incubate plate at 37C for 30min',
+  'Repeat 4-6 times (this is a "wash" recipe again):',
+  '  - Add 200-300ul washing buffer to each well',
+  '  - Discard solution in each well',
+  'Add 100ul of Substrate (TMB) Solution to each well',
+  'Incubate at 37C for 15min (protect from light)',
+  'Add 100ul of Stop Solution to each well and mix *well*',
+  'Read absorbance at 450nm within 30min after adding '
+];
+
 var parser = require('./lib/steps');
 parser.use(/(\w+)\s(\w+)[^\d]+(\d+C)[^\d]+(\d+min)/, function(_, action, object, temperature, duration){
   return {
@@ -100,24 +128,23 @@ function sendMove(remote) {
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
 // http://inspirit.github.io/jsfeat/js/compatibility.js
-// navigator.getUserMedia({ video: true }, function(stream){
-//   return;
-//   try {
-//     video.src = webkitURL.createObjectURL(stream);
-//   } catch (err) {
-//     video.src = stream;
-//   }
+navigator.getUserMedia({ video: true }, function(stream){
+  try {
+    video.src = webkitURL.createObjectURL(stream);
+  } catch (err) {
+    video.src = stream;
+  }
 
-//   start();
-// }, function(){
-//   console.log(arguments);
-// });
+  setTimeout(start, 500);
+}, function(){
+  console.log(arguments);
+});
 
 function start() {
   video.play();
   demo_app();
   requestAnimationFrame(tick);
-
+  return;
   // add lab equipment
   var microplate = new Microplate(drawing);
   microplate.move(100, 100);
@@ -149,17 +176,21 @@ var gui,options,ctx,canvasWidth,canvasHeight;
 var img_u8;
 
 function demo_app() {
+  var content = document.querySelector('.content');
+  var ratio = 480 / 640;
+  canvas.width = content.offsetWidth
+  canvas.height = content.offsetWidth * ratio;
   canvasWidth  = canvas.width;
   canvasHeight = canvas.height;
   ctx = canvas.getContext('2d');
-  img_u8 = new jsfeat.matrix_t(640, 480, jsfeat.U8C1_t);
+  img_u8 = new jsfeat.matrix_t(canvas.width, canvas.height, jsfeat.U8C1_t);
 }
 
 function tick() {
   requestAnimationFrame(tick);
 
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    ctx.drawImage(video, 0, 0, 640, 480);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     return;
     var imageData = ctx.getImageData(0, 0, 640, 480);
     jsfeat.imgproc.grayscale(imageData.data, img_u8.data);
