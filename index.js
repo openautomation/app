@@ -128,17 +128,17 @@ function sendMove(remote) {
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
 // http://inspirit.github.io/jsfeat/js/compatibility.js
-navigator.getUserMedia({ video: true }, function(stream){
-  try {
-    video.src = webkitURL.createObjectURL(stream);
-  } catch (err) {
-    video.src = stream;
-  }
+// navigator.getUserMedia({ video: true }, function(stream){
+//   try {
+//     video.src = webkitURL.createObjectURL(stream);
+//   } catch (err) {
+//     video.src = stream;
+//   }
 
-  setTimeout(start, 500);
-}, function(){
-  console.log(arguments);
-});
+//   setTimeout(start, 500);
+// }, function(){
+//   console.log(arguments);
+// });
 
 function start() {
   video.play();
