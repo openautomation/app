@@ -1,6 +1,8 @@
 
-build: components index.js openautomation.css template.js
-	@component build --dev
+build:
+	component build -d
+	mv build/build.js public/javascripts/
+	mv build/build.css public/stylesheets/
 
 template.js: template.html
 	@component convert $<
@@ -11,4 +13,4 @@ components: component.json
 clean:
 	rm -fr build components template.js
 
-.PHONY: clean
+.PHONY: clean build

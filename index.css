@@ -1,14 +1,18 @@
 html, body {
+  margin-top: 0px;
+  padding-top: 0px;
+  top: 0;
   margin: 0px;
   padding: 0px;
   color: rgb(85, 85, 85);
-  position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
-body * {
+body {
   font-family: 'Open Sans';
+  margin-top: 0px;
 }
 
 a, span, p, input, label, button {
@@ -18,15 +22,22 @@ a, span, p, input, label, button {
 ul {
   list-style: none;
   padding: 0px;
+  margin: 0px;
 }
 
 .container {
+  position: relative;
+  padding: 0px;
+  margin: 0px;
   height: 100%;
+  background: red;
 }
 
 .sidebar {
   position: relative;
   height: 100%;
+  padding: 0px;
+  margin: 0px;
   color: white;
   background-color: #1b1e24;
   width: 250px;
@@ -112,4 +123,12 @@ input {
   -webkit-backface-visibility: hidden;
   border-radius: 50%;
   border: 3px solid #333;
+}
+
+.step {
+  padding: 10px 15px;
+}
+
+.step:focus {
+  outline: 0;
 }

@@ -16,9 +16,12 @@
     "component/inherit": "*",
     "tower/resource": "*",
     "tower/query": "*",
-    "tower/adapter": "*"
+    "tower/adapter": "*",
+    "necolas/normalize.css": "*"
   },
-  "development": {},
+  "development": {
+    "component/live-css": "*"
+  },
   "license": "MIT",
   "main": "index.js",
   "scripts": [

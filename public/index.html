@@ -1,20 +1,11 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <link href="/stylesheets/build.css" rel="stylesheet"></link>
   </head>
   <body>
-    <style>
-    .step {
-      padding: 10px 15px;
-    }
-
-    .step:focus {
-      outline: 0;
-    }
-
-    </style>
     <div class="container">
       <div class="sidebar">
         <ol class="steps">
@@ -25,7 +16,7 @@
       <div class="content">
         <video id="webcam" width="640" height="480" style="display:none;"></video>
 
-        <div style=" width:640px;height:480px;margin: 10px auto;">
+        <div>
           <canvas id="canvas" width="640" height="480" style="position: absolute"></canvas>
           <div id="sprites" style="width: 640, height: 480, position: absolute"></div>
         </div>

@@ -23,6 +23,8 @@ var Microplate = require('./lib/microplate');
 var LiquidContainer = require('./lib/liquid-container');
 var PetriDish = require('./lib/petri-dish');
 
+require('live-css').start();
+
 /**
  * Canvas.
  */
@@ -66,17 +68,18 @@ function sendMove(remote) {
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
 // http://inspirit.github.io/jsfeat/js/compatibility.js
-navigator.getUserMedia({ video: true }, function(stream){
-  try {
-    video.src = webkitURL.createObjectURL(stream);
-  } catch (err) {
-    video.src = stream;
-  }
+// navigator.getUserMedia({ video: true }, function(stream){
+//   return;
+//   try {
+//     video.src = webkitURL.createObjectURL(stream);
+//   } catch (err) {
+//     video.src = stream;
+//   }
 
-  start();
-}, function(){
-  console.log(arguments);
-});
+//   start();
+// }, function(){
+//   console.log(arguments);
+// });
 
 function start() {
   video.play();
