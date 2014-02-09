@@ -7,6 +7,7 @@ var koa = require('koa');
 var route = require('koa-route');
 var serve = require('koa-static');
 var timer = require('koa-response-time');
+var favicon = require('koa-favicon');
 var compress = require('koa-compress');
 var index = require('./routes');
 var actions = require('./routes/action');
@@ -21,6 +22,7 @@ var app = koa();
  * Middleware.
  */
 
+app.use(favicon());
 app.use(timer());
 app.use(compress({
   filter: function (content_type) {
