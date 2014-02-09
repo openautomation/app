@@ -17,7 +17,12 @@
     "tower/resource": "*",
     "tower/query": "*",
     "tower/adapter": "*",
-    "necolas/normalize.css": "*"
+    "necolas/normalize.css": "*",
+    "tower/template": "*",
+    "tower/content": "*",
+    "tower/event-directive": "*",
+    "tower/text-directive": "*",
+    "tower/list-directive": "*"
   },
   "development": {
     "component/live-css": "*"

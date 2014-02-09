@@ -21,7 +21,7 @@ exports.create = function *(){
   });
 
   // XXX: should call ROS script
-  this.json(action);
+  //this.json(action);
 };
 
 function movement(x, y, z) {

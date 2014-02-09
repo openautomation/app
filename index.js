@@ -4,6 +4,12 @@
  */
 
 var adapter = require('./lib/rest');
+var template = require('tower-template');
+require('tower-list-directive');
+require('tower-text-directive');
+var event = require('tower-event-directive');
+event('click');
+var content = require('tower-content');
 var query = require('tower-query');
 query.use(adapter);
 var resource = require('tower-resource');
@@ -24,6 +30,19 @@ var LiquidContainer = require('./lib/liquid-container');
 var PetriDish = require('./lib/petri-dish');
 
 require('live-css').start();
+
+content('root')
+  .action('run', function(){
+    
+  });
+
+/**
+ * Template.
+ */
+
+template(document.body)({
+  steps: ['Incubate microplate at 37C for 15min']
+});
 
 /**
  * Canvas.

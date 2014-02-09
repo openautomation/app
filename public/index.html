@@ -8,10 +8,14 @@
   <body>
     <div class="container">
       <div class="sidebar">
-        <ol class="steps">
-          <li class="step" contenteditable>Add 10ml Liquid A to each well</li>
-          <li class="step" contenteditable>Incubate microplate at 37C for 15min</li>
-        </ol>
+        <div class="sidebar-content">
+          <ol class="steps">
+            <li class="step" contenteditable>Add <span class="step-measurement">10ml</span> <span class="step-liquid">Liquid A</span> to each well<span class="step-status"></span></li>
+            <li class="step" contenteditable data-each="step in steps"><span data-text="step"></span></li>
+          </ol>
+
+          <a class="sidebar-button" on-click="run()">Run</a>
+        </div>
       </div>
       <div class="content">
         <video id="webcam" width="640" height="480" style="display:none;"></video>
