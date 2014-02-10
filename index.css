@@ -1,3 +1,14 @@
+/*@font-face {
+  font-family: "Helvetica Neue Thin";
+  src: url("/fonts/helvetica-neue-thin.ttf");
+}*/
+
+@font-face {
+  font-family: "Helvetica Neue Thin";
+  src: local("Helvetica Neue Thin"),
+       local("HelveticaNeue-Thin");
+}
+
 html, body {
   margin-top: 0px;
   padding-top: 0px;
@@ -12,7 +23,9 @@ html, body {
 
 body {
   margin-top: 0px;
-  font: 17px/1.5 Helvetica, "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, Verdana, sans-serif;
+  /*font: 17px/1.5 "Helvetica Neue Thin", Helvetica, "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, Verdana, sans-serif;*/
+  /* http://font.downloadatoz.com/download,66405,helvetica-neue-ce-35-thin-for-mac.html */
+  font: 17px/1.5 "Helvetica Neue Thin", "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
   background: white;
   margin: 0;
   color: #33333d;
@@ -169,7 +182,7 @@ input {
 }
 
 .step-details {
-  font-family: "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, Verdana, sans-serif;
+  /*font-family: "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, Verdana, sans-serif;*/
   font-size: 8px;
   color: hsl(0, 0%, 65%);
 }
@@ -217,29 +230,50 @@ input {
 
 @media only screen and (max-width: 767px) {
   .step {
-    padding: 20px 10px 20px 30px;
+    padding: 20px 10px 20px 15px;
     margin: 0px 0px;
     border: none;
     border-bottom: 1px solid hsl(0, 0%, 18%);
+  }
+
+  .step:hover, .step:active {
+    background: hsl(0, 0%, 24%);
   }
 
   .step-title {
     font-size: 16px;
   }
 
+  .step-details {
+    font-size: 10px;
+  }
+
+  .timeline {
+    position: absolute;
+    width: 4px;
+    height: 20px;
+    right: 18px;
+    top: 57px;
+    height: 315px;
+    background: hsl(0, 0%, 30%);
+    z-index: 1;
+  }
+
   .step i {
-    display: none;
     color: hsl(0, 0%, 30%);
-    font-size: 8px;
-    top: 35px;
+    font-size: 16px;
+    top: auto;
+    bottom: 27px;
+    z-index: 2;
   }
 
   .step i.first {
-    left: 13px;
+    left: auto;
+    right: 13px;
   }
 
   .step i.last {
-
+    display: none;
   }
 
   .content {
