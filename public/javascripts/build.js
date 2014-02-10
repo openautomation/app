@@ -14800,7 +14800,6 @@ var labBox = {\n\
   height: 20000\n\
 };\n\
 \n\
-document.querySelector('.viewport').style.display = 'none';\n\
 var paused = false;\n\
 var videostream;\n\
 var gif = 'data:image/gif;base64,R0lGODlhEAAJAIAAAP///wAAACH5BAEAAAAALAAAAAAQAAkAAAIKhI+py+0Po5yUFQA7';\n\
@@ -14809,13 +14808,15 @@ events.bind(window, 'click', function(e){\n\
   if (paused) {\n\
     document.querySelector('.snapshot').src = gif;\n\
     document.querySelector('.viewport').style.display = 'none';\n\
+    document.querySelector('.editor').style.display = 'none';\n\
     //canvas.style.webkitFilter = '';\n\
     video.play();\n\
   } else {\n\
     video.pause();\n\
     //document.querySelector('.snapshot').style.backgroundImage = 'url(' + canvas.toDataURL() + ');';\n\
-    document.querySelector('.snapshot').src = canvas.toDataURL('image/jpeg', 0.01);\n\
+    document.querySelector('.snapshot').src = canvas.toDataURL('image/webp', 0.001);\n\
     document.querySelector('.viewport').style.display = 'block';\n\
+    document.querySelector('.editor').style.display = 'block';\n\
     //canvas.style.webkitFilter = 'blur(13px)';\n\
   }\n\
   paused = !paused;\n\
@@ -14846,6 +14847,8 @@ function sendMove(remote) {\n\
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;\n\
 \n\
 // http://inspirit.github.io/jsfeat/js/compatibility.js\n\
+document.querySelector('.viewport').style.display = 'none';\n\
+document.querySelector('.editor').style.display = 'none';\n\
 navigator.getUserMedia({ video: true }, function(stream){\n\
   videostream = stream;\n\
   try {\n\

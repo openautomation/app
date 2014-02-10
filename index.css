@@ -25,11 +25,14 @@ body {
   margin-top: 0px;
   /*font: 17px/1.5 "Helvetica Neue Thin", Helvetica, "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, Verdana, sans-serif;*/
   /* http://font.downloadatoz.com/download,66405,helvetica-neue-ce-35-thin-for-mac.html */
-  font: 17px/1.5 "Helvetica Neue Thin", "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
   background: white;
   margin: 0;
   color: #33333d;
   overflow-x: hidden;
+}
+
+body, h1, h2, h3 {
+  font: 17px/1.5 "Helvetica Neue Thin", "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
 }
 
 a, span, p, input, label, button {
@@ -242,7 +245,7 @@ input {
   display: none;
 }
 
-.viewport {
+.viewport, .editor {
   position: absolute;
   width: 100%;
   height: 100%;
@@ -268,24 +271,43 @@ input {
 .header {
   padding: 15px;
   line-height: 1;
-  font-size: 14px;
+  font-size: 26px;
   text-align: center;
-  border-bottom: 1px solid hsl(0, 0%, 18%);
+  color: hsl(0, 0, 18%);
 }
 
-.menu-input:focus {
+.input:focus {
   border: none;
   outline: none;
 }
 
-.menu-input {
+.fields {
+  padding: 15px;
+  text-align: center;
+  display: flex;
+  position: relative;
+  justify-content: center;
+  align-items: center;
+}
+
+.input-label {
+  position: relative;
+  display: block;
+  width: 70%;
+}
+
+.input {
   font-family: "Lucida Grande";
   position: relative;
   display: block;
-  width: 250px;
   border: none;
-  height: 30px;
+  height: 50px;
+  width: 100%;
+  font-size: 26px;
+  padding: 5px 10px;
+  color: hsl(0, 0%, 99%);
   background: hsl(0, 0%, 35%);
+  margin-bottom: 10px;
 }
 
 .snapshot {
@@ -297,7 +319,7 @@ input {
   width: 100%;
   height: 100%;
   background: white;
-  opacity: 0.6;
+  opacity: 0.8;
   top: 0px;
 }
 
@@ -313,5 +335,9 @@ input {
   .sidebar {
     width: max-width;
     width: 100%;
+  }
+
+  .glass {
+    opacity: 0.7;
   }
 }

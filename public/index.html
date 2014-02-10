@@ -60,13 +60,16 @@
           <!--img class="snapshot" src="http://i.imgur.com/ZtWtALT.jpg" width="320" height="480"></img-->
           <img class="snapshot"></img>
           <div class="glass"></div>
+        </div>
 
+        <div class="editor">
           <h2 class="header">Add sample to each microplate well</h2>
-          <ul class="fields">
-            <li class="step" on-click="edit()">
-              <input class="menu-input" type="text" pattern="\d*">
-            </li>
-          </ul>
+          <div class="fields">
+            <label class="input-label">
+              <input placeholder="Liquid" class="input" type="text">
+              <input placeholder="Volume (ml)" class="input" type="text" pattern="\d*">
+            </label>
+          </div>
         </div>
       </div>
     </div>

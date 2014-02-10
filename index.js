@@ -105,7 +105,6 @@ var labBox = {
   height: 20000
 };
 
-document.querySelector('.viewport').style.display = 'none';
 var paused = false;
 var videostream;
 var gif = 'data:image/gif;base64,R0lGODlhEAAJAIAAAP///wAAACH5BAEAAAAALAAAAAAQAAkAAAIKhI+py+0Po5yUFQA7';
@@ -114,13 +113,15 @@ events.bind(window, 'click', function(e){
   if (paused) {
     document.querySelector('.snapshot').src = gif;
     document.querySelector('.viewport').style.display = 'none';
+    document.querySelector('.editor').style.display = 'none';
     //canvas.style.webkitFilter = '';
     video.play();
   } else {
     video.pause();
     //document.querySelector('.snapshot').style.backgroundImage = 'url(' + canvas.toDataURL() + ');';
-    document.querySelector('.snapshot').src = canvas.toDataURL('image/jpeg', 0.01);
+    document.querySelector('.snapshot').src = canvas.toDataURL('image/webp', 0.001);
     document.querySelector('.viewport').style.display = 'block';
+    document.querySelector('.editor').style.display = 'block';
     //canvas.style.webkitFilter = 'blur(13px)';
   }
   paused = !paused;
@@ -151,6 +152,8 @@ function sendMove(remote) {
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
 // http://inspirit.github.io/jsfeat/js/compatibility.js
+document.querySelector('.viewport').style.display = 'none';
+document.querySelector('.editor').style.display = 'none';
 navigator.getUserMedia({ video: true }, function(stream){
   videostream = stream;
   try {
