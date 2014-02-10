@@ -100,39 +100,7 @@ input {
   position: relative;
   margin-left: 320px;
   height: 100%;
-}
-
-.content ul {
-  padding: 3% 1.5% 3% 1.5%;
-  text-align: center;
-  display: block;
-  position: relative;
-  margin: 0px auto;
-}
-
-.content li {
-  /*width: 30.3333%;
-  margin: 0 1.5% 3% 1.5%;
-  padding-bottom: 29.333%;*/
-  position: relative;
-  float: left;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  -webkit-transform: translateZ(0);
-}
-
-.content .image {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-position: center center;
-  background-size: cover;
-  -webkit-backface-visibility: hidden;
-  border-radius: 50%;
-  border: 3px solid #333;
+  overflow: hidden;
 }
 
 .steps, .fields {
@@ -225,9 +193,112 @@ input {
 @media only screen and (min-width: 768px) {
   
 }
+.step {
+  position: relative;
+  padding: 20px 10px 20px 15px;
+  margin: 0px 0px;
+  border: none;
+  display: block;
+  border-bottom: 1px solid hsl(0, 0%, 18%);
+}
 
-.steps {
+.step:hover, .step:active {
+  background: hsl(0, 0%, 24%);
+}
+
+.step-title {
+  font-size: 16px;
+}
+
+.step-details {
+  font-size: 11px;
+}
+
+.timeline {
+  position: absolute;
+  width: 4px;
+  height: 20px;
+  right: 18px;
+  top: 57px;
+  height: 315px;
+  background: hsl(0, 0%, 30%);
+  z-index: 1;
+}
+
+.step i {
+  color: hsl(0, 0%, 30%);
+  font-size: 16px;
+  top: auto;
+  bottom: 27px;
+  z-index: 2;
+}
+
+.step i.first {
+  left: auto;
+  right: 13px;
+}
+
+.step i.last {
   display: none;
+}
+
+.viewport {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0px;
+  bottom: 0px;
+  right: 0px;
+  left: 0px;
+}
+
+.sidebar-content {
+  position: relative;
+  height: 100%;
+}
+
+.sidebar-button {
+  display: block;
+  position: absolute;
+  bottom: 10px;
+  left: 0px;
+  right: 0px;
+}
+
+.header {
+  padding: 15px;
+  line-height: 1;
+  font-size: 14px;
+  text-align: center;
+  border-bottom: 1px solid hsl(0, 0%, 18%);
+}
+
+.menu-input:focus {
+  border: none;
+  outline: none;
+}
+
+.menu-input {
+  font-family: "Lucida Grande";
+  position: relative;
+  display: block;
+  width: 250px;
+  border: none;
+  height: 30px;
+  background: hsl(0, 0%, 35%);
+}
+
+.snapshot {
+  -webkit-filter: blur(40px);
+}
+
+.glass {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: white;
+  opacity: 0.6;
+  top: 0px;
 }
 
 /**
@@ -235,113 +306,12 @@ input {
  */
 
 @media only screen and (max-width: 767px) {
-  .step {
-    position: relative;
-    padding: 20px 10px 20px 15px;
-    margin: 0px 0px;
-    border: none;
-    display: block;
-    border-bottom: 1px solid hsl(0, 0%, 18%);
-  }
-
-  .step:hover, .step:active {
-    background: hsl(0, 0%, 24%);
-  }
-
-  .step-title {
-    font-size: 16px;
-  }
-
-  .step-details {
-    font-size: 11px;
-  }
-
-  .timeline {
-    position: absolute;
-    width: 4px;
-    height: 20px;
-    right: 18px;
-    top: 57px;
-    height: 315px;
-    background: hsl(0, 0%, 30%);
-    z-index: 1;
-  }
-
-  .step i {
-    color: hsl(0, 0%, 30%);
-    font-size: 16px;
-    top: auto;
-    bottom: 27px;
-    z-index: 2;
-  }
-
-  .step i.first {
-    left: auto;
-    right: 13px;
-  }
-
-  .step i.last {
-    display: none;
-  }
-
   .content {
     display: none;
   }
 
   .sidebar {
+    width: max-width;
     width: 100%;
-  }
-
-  .viewport {
-    position: absolute;
-  }
-
-  .sidebar-content {
-    position: relative;
-    height: 100%;
-  }
-
-  .sidebar-button {
-    display: block;
-    position: absolute;
-    bottom: 10px;
-    left: 0px;
-    right: 0px;
-  }
-
-  .header {
-    padding: 15px;
-    line-height: 1;
-    font-size: 14px;
-    text-align: center;
-    border-bottom: 1px solid hsl(0, 0%, 18%);
-  }
-
-  .menu-input:focus {
-    border: none;
-    outline: none;
-  }
-
-  .menu-input {
-    font-family: "Lucida Grande";
-    position: relative;
-    display: block;
-    width: 250px;
-    border: none;
-    height: 30px;
-    background: hsl(0, 0%, 35%);
-  }
-
-  .snapshot {
-    -webkit-filter: blur(20px);
-  }
-
-  .glass {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background: white;
-    opacity: 0.6;
-    top: 0px;
   }
 }

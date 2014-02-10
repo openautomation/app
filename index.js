@@ -36,7 +36,7 @@ content('root')
     
   })
   .action('edit', function(){
-    
+
   });
 
 /**
@@ -94,6 +94,7 @@ template(document.body)({
 
 var video = document.getElementById('webcam');
 var canvas = document.getElementById('canvas');
+canvas.style.zIndex = 0;
 
 /**
  * Hardcoded lab box dimensions.
@@ -104,7 +105,27 @@ var labBox = {
   height: 20000
 };
 
-events.bind(canvas, 'click', function(e){
+document.querySelector('.viewport').style.display = 'none';
+var paused = false;
+var videostream;
+var gif = 'data:image/gif;base64,R0lGODlhEAAJAIAAAP///wAAACH5BAEAAAAALAAAAAAQAAkAAAIKhI+py+0Po5yUFQA7';
+document.querySelector('.snapshot').src = gif;
+events.bind(window, 'click', function(e){
+  if (paused) {
+    document.querySelector('.snapshot').src = gif;
+    document.querySelector('.viewport').style.display = 'none';
+    //canvas.style.webkitFilter = '';
+    video.play();
+  } else {
+    console.log(canvas.toDataURL())
+    video.pause();
+    //document.querySelector('.snapshot').style.backgroundImage = 'url(' + canvas.toDataURL() + ');';
+    document.querySelector('.snapshot').src = canvas.toDataURL('image/jpeg', 0.3);
+    document.querySelector('.viewport').style.display = 'block';
+    //canvas.style.webkitFilter = 'blur(13px)';
+  }
+  paused = !paused;
+  return;
   // get position relative to canvas
   var local = canvasPosition(canvas, e.clientX, e.clientY);
   // convert to coordinates of lab box
@@ -131,17 +152,18 @@ function sendMove(remote) {
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
 // http://inspirit.github.io/jsfeat/js/compatibility.js
-// navigator.getUserMedia({ video: true }, function(stream){
-//   try {
-//     video.src = webkitURL.createObjectURL(stream);
-//   } catch (err) {
-//     video.src = stream;
-//   }
+navigator.getUserMedia({ video: true }, function(stream){
+  videostream = stream;
+  try {
+    video.src = webkitURL.createObjectURL(stream);
+  } catch (err) {
+    video.src = stream;
+  }
 
-//   setTimeout(start, 500);
-// }, function(){
-//   console.log(arguments);
-// });
+  setTimeout(start, 500);
+}, function(){
+  console.log(arguments);
+});
 
 function start() {
   video.play();
@@ -189,13 +211,14 @@ function demo_app() {
   img_u8 = new jsfeat.matrix_t(canvas.width, canvas.height, jsfeat.U8C1_t);
 }
 
+var imageData;
 function tick() {
   requestAnimationFrame(tick);
 
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     return;
-    var imageData = ctx.getImageData(0, 0, 640, 480);
     jsfeat.imgproc.grayscale(imageData.data, img_u8.data);
 
     var r = options.blur_radius|0;

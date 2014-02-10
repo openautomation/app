@@ -14731,7 +14731,7 @@ content('root')\n\
     \n\
   })\n\
   .action('edit', function(){\n\
-    \n\
+\n\
   });\n\
 \n\
 /**\n\
@@ -14789,6 +14789,7 @@ template(document.body)({\n\
 \n\
 var video = document.getElementById('webcam');\n\
 var canvas = document.getElementById('canvas');\n\
+canvas.style.zIndex = 0;\n\
 \n\
 /**\n\
  * Hardcoded lab box dimensions.\n\
@@ -14799,7 +14800,27 @@ var labBox = {\n\
   height: 20000\n\
 };\n\
 \n\
-events.bind(canvas, 'click', function(e){\n\
+document.querySelector('.viewport').style.display = 'none';\n\
+var paused = false;\n\
+var videostream;\n\
+var gif = 'data:image/gif;base64,R0lGODlhEAAJAIAAAP///wAAACH5BAEAAAAALAAAAAAQAAkAAAIKhI+py+0Po5yUFQA7';\n\
+document.querySelector('.snapshot').src = gif;\n\
+events.bind(window, 'click', function(e){\n\
+  if (paused) {\n\
+    document.querySelector('.snapshot').src = gif;\n\
+    document.querySelector('.viewport').style.display = 'none';\n\
+    //canvas.style.webkitFilter = '';\n\
+    video.play();\n\
+  } else {\n\
+    console.log(canvas.toDataURL())\n\
+    video.pause();\n\
+    //document.querySelector('.snapshot').style.backgroundImage = 'url(' + canvas.toDataURL() + ');';\n\
+    document.querySelector('.snapshot').src = canvas.toDataURL('image/jpeg', 0.3);\n\
+    document.querySelector('.viewport').style.display = 'block';\n\
+    //canvas.style.webkitFilter = 'blur(13px)';\n\
+  }\n\
+  paused = !paused;\n\
+  return;\n\
   // get position relative to canvas\n\
   var local = canvasPosition(canvas, e.clientX, e.clientY);\n\
   // convert to coordinates of lab box\n\
@@ -14826,17 +14847,18 @@ function sendMove(remote) {\n\
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;\n\
 \n\
 // http://inspirit.github.io/jsfeat/js/compatibility.js\n\
-// navigator.getUserMedia({ video: true }, function(stream){\n\
-//   try {\n\
-//     video.src = webkitURL.createObjectURL(stream);\n\
-//   } catch (err) {\n\
-//     video.src = stream;\n\
-//   }\n\
+navigator.getUserMedia({ video: true }, function(stream){\n\
+  videostream = stream;\n\
+  try {\n\
+    video.src = webkitURL.createObjectURL(stream);\n\
+  } catch (err) {\n\
+    video.src = stream;\n\
+  }\n\
 \n\
-//   setTimeout(start, 500);\n\
-// }, function(){\n\
-//   console.log(arguments);\n\
-// });\n\
+  setTimeout(start, 500);\n\
+}, function(){\n\
+  console.log(arguments);\n\
+});\n\
 \n\
 function start() {\n\
   video.play();\n\
@@ -14884,13 +14906,14 @@ function demo_app() {\n\
   img_u8 = new jsfeat.matrix_t(canvas.width, canvas.height, jsfeat.U8C1_t);\n\
 }\n\
 \n\
+var imageData;\n\
 function tick() {\n\
   requestAnimationFrame(tick);\n\
 \n\
   if (video.readyState === video.HAVE_ENOUGH_DATA) {\n\
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);\n\
+    imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);\n\
     return;\n\
-    var imageData = ctx.getImageData(0, 0, 640, 480);\n\
     jsfeat.imgproc.grayscale(imageData.data, img_u8.data);\n\
 \n\
     var r = options.blur_radius|0;\n\
