@@ -14729,6 +14729,9 @@ require('live-css').start();\n\
 content('root')\n\
   .action('run', function(){\n\
     \n\
+  })\n\
+  .action('edit', function(){\n\
+    \n\
   });\n\
 \n\
 /**\n\

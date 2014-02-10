@@ -13,9 +13,24 @@
     <div class="container">
       <div class="sidebar">
         <div class="sidebar-content">
-          <i class="timeline"></i>
+          <div class="viewport">
+            <img class="snapshot" src="http://i.imgur.com/ZtWtALT.jpg" width="320" height="480"></img>
+            <div class="glass"></div>
+          </div>
+          
+          <a class="sidebar-button" on-click="run()">Back</a>
+          <!-- video screen
+          <h2 class="header">Add sample to each microplate well</h2>
+          <ul class="fields">
+            <li class="step" on-click="edit()">
+              <input class="menu-input" type="text" pattern="\d*">
+            </li>
+          </ul>
+          -->
+
           <ul class="steps">
-            <li class="step">
+            <i class="timeline"></i>
+            <li class="step" on-click="edit()">
               <i class="first fa fa-circle"></i>
               <div class="step-title">Add sample to each microplate well</div>
               <span class="step-details">Liquid A, 10ml each well</span>
@@ -45,7 +60,7 @@
             <!--<li class="step" data-each="step in steps"><span data-text="step"></span></li>-->
           </ul>
 
-          <a class="sidebar-button" on-click="run()">Run</a>
+          <!--a class="sidebar-button" on-click="run()">Run</a-->
         </div>
       </div>
       <div class="content">

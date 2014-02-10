@@ -34,6 +34,9 @@ require('live-css').start();
 content('root')
   .action('run', function(){
     
+  })
+  .action('edit', function(){
+    
   });
 
 /**
