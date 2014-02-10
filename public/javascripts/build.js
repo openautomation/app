@@ -14812,10 +14812,9 @@ events.bind(window, 'click', function(e){\n\
     //canvas.style.webkitFilter = '';\n\
     video.play();\n\
   } else {\n\
-    console.log(canvas.toDataURL())\n\
     video.pause();\n\
     //document.querySelector('.snapshot').style.backgroundImage = 'url(' + canvas.toDataURL() + ');';\n\
-    document.querySelector('.snapshot').src = canvas.toDataURL('image/jpeg', 0.3);\n\
+    document.querySelector('.snapshot').src = canvas.toDataURL('image/jpeg', 0.01);\n\
     document.querySelector('.viewport').style.display = 'block';\n\
     //canvas.style.webkitFilter = 'blur(13px)';\n\
   }\n\

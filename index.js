@@ -117,10 +117,9 @@ events.bind(window, 'click', function(e){
     //canvas.style.webkitFilter = '';
     video.play();
   } else {
-    console.log(canvas.toDataURL())
     video.pause();
     //document.querySelector('.snapshot').style.backgroundImage = 'url(' + canvas.toDataURL() + ');';
-    document.querySelector('.snapshot').src = canvas.toDataURL('image/jpeg', 0.3);
+    document.querySelector('.snapshot').src = canvas.toDataURL('image/jpeg', 0.01);
     document.querySelector('.viewport').style.display = 'block';
     //canvas.style.webkitFilter = 'blur(13px)';
   }
