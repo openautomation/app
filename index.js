@@ -110,6 +110,7 @@ var videostream;
 var gif = 'data:image/gif;base64,R0lGODlhEAAJAIAAAP///wAAACH5BAEAAAAALAAAAAAQAAkAAAIKhI+py+0Po5yUFQA7';
 document.querySelector('.snapshot').src = gif;
 events.bind(window, 'click', function(e){
+  if (e.target.tagName.toLowerCase() == 'input') return;
   if (paused) {
     document.querySelector('.snapshot').src = gif;
     document.querySelector('.viewport').style.display = 'none';
