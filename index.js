@@ -156,8 +156,6 @@ function sendMove(remote) {
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
 // http://inspirit.github.io/jsfeat/js/compatibility.js
-document.querySelector('.viewport').style.display = 'none';
-document.querySelector('.editor').style.display = 'none';
 navigator.getUserMedia({ video: true }, function(stream){
   videostream = stream;
   try {
