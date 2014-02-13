@@ -10710,7 +10710,7 @@ var labBox = {\n\
 var paused = false;\n\
 var videostream;\n\
 var gif = 'data:image/gif;base64,R0lGODlhEAAJAIAAAP///wAAACH5BAEAAAAALAAAAAAQAAkAAAIKhI+py+0Po5yUFQA7';\n\
-document.querySelector('.snapshot').src = gif;\n\
+//document.querySelector('.snapshot').src = gif;\n\
 events.bind(window, 'clicks', function(e){\n\
   if (e.target.tagName.toLowerCase() == 'input') return;\n\
   if (paused) {\n\

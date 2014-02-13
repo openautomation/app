@@ -111,7 +111,7 @@ var labBox = {
 var paused = false;
 var videostream;
 var gif = 'data:image/gif;base64,R0lGODlhEAAJAIAAAP///wAAACH5BAEAAAAALAAAAAAQAAkAAAIKhI+py+0Po5yUFQA7';
-document.querySelector('.snapshot').src = gif;
+//document.querySelector('.snapshot').src = gif;
 events.bind(window, 'clicks', function(e){
   if (e.target.tagName.toLowerCase() == 'input') return;
   if (paused) {
