@@ -11429,16 +11429,19 @@ app.controller('StepsController', function ($scope){\n\
   $scope.view = 'steps';\n\
 \n\
   $scope.steps = [\n\
-    { title: 'Add sample to each microplate well',\n\
+    { title: 'Add sample',// to each microplate well',\n\
+      icon: 'liquid',\n\
       variables: [\n\
         { name: 'Liquid', value: 'Liquid A', type: 'array' },\n\
         { name: 'Volume (ml)', value: 10, type: 'number' },\n\
         { name: 'Wells', value: '1-5', type: 'microplate' } ] },\n\
     { title: 'Incubate microplate',\n\
+      icon: 'fridge',\n\
       variables: [\n\
         { name: 'Temperature (C)', value: 37, type: 'number' },\n\
         { name: 'Duration (min)', value: 60, type: 'number' } ] },\n\
     { title: 'Wash microplate',\n\
+      icon: 'faucet',\n\
       variables: [\n\
         { name: 'Times', value: 4, type: 'number' } ] }\n\
   ];\n\

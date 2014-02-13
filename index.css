@@ -227,7 +227,7 @@ a {
 }
 
 .step-title {
-  font-size: 16px;
+  font-size: 16px; /* vs. 22px */
 }
 
 .step-details {
@@ -235,6 +235,7 @@ a {
 }
 
 .timeline {
+  display: none;
   position: absolute;
   width: 4px;
   height: 20px;
@@ -249,9 +250,26 @@ a {
   color: hsl(0, 0%, 30%);
   font-size: 16px;
   top: auto;
-  bottom: 27px;
+  bottom: 20px;
   z-index: 2;
+  width: 30px;
+  height: 30px;
+  border-radius: 16px;
+  border: 1px solid hsl(0, 0%, 56%);
+  -webkit-backface-visibility: hidden;
+  background-position: 5px 5px;
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+}
+
+.liquid-icon {
   background-image: url(/icons/liquid.png);
+}
+.fridge-icon {
+  background-image: url(/icons/fridge.png);
+}
+.faucet-icon {
+  background-image: url(/icons/faucet.png);
 }
 
 .step i.first {

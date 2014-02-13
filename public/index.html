@@ -19,7 +19,7 @@
           <ul class="steps" ng-show="'steps' == view">
             <i class="timeline"></i>
             <li ng-repeat="step in steps" class="step" ng-click="showStep(step)">
-              <i class="first fa fa-circle"></i>
+              <i class="first {{step.icon}}-icon"></i>
               <div class="step-title" ng-bind="step.title"></div>
               <div class="step-details">
                 <span class="step-detail" ng-repeat="variable in step.variables" ng-bind="variable.value"></span>
