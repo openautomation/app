@@ -4,12 +4,6 @@
  */
 
 var adapter = require('./lib/rest');
-var template = require('tower-template');
-require('tower-list-directive');
-require('tower-text-directive');
-var event = require('tower-event-directive');
-event('click');
-var content = require('tower-content');
 var query = require('tower-query');
 query.use(adapter);
 var resource = require('tower-resource');
@@ -22,6 +16,12 @@ var SVG = require('svg.js').SVG;
 var drawing = SVG('sprites').fixSubPixelOffset();
 
 /**
+ * Angular stuff.
+ */
+
+var app = angular.module('App', []);
+
+/**
  * Lab equipment.
  */
 
@@ -31,61 +31,64 @@ var PetriDish = require('./lib/petri-dish');
 
 require('live-css').start();
 
-content('root')
-  .action('run', function(){
-    
-  })
-  .action('edit', function(){
+app.controller('StepsController', function ($scope){
+  $scope.view = 'steps';
 
-  });
+  $scope.steps = [
+    { title: 'Add sample to each microplate well',
+      variables: [
+        { name: 'Liquid', value: 'Liquid A', type: 'array' },
+        { name: 'Volume (ml)', value: 10, type: 'number' },
+        { name: 'Wells', value: '1-5', type: 'microplate' } ] },
+    { title: 'Incubate microplate',
+      variables: [
+        { name: 'Temperature (C)', value: 37, type: 'number' },
+        { name: 'Duration (min)', value: 60, type: 'number' } ] },
+    { title: 'Wash microplate',
+      variables: [
+        { name: 'Times', value: 4, type: 'number' } ] }
+  ];
 
-/**
- * Add :volume of :solution to :containers
-  - Incubate :container at :temperature for :duration
-  - Measure :property at :constraints (Read absorbance...)
-  - Discard :solution from :containers
- */
-/**
- * 
- */
-var steps = [
-  'Add 100ul of negative or positive control or sample to each well',
-  'Incubate the plate at 37C for 60min',
-  'Discard the solution in each well (aspirating or decanting)',
-  'Repeat 4-6 times (this is a "wash" recipe):',
-  '  - Add 200-300ul washing buffer to each well',
-  '  - Discard solution in each well',
-  'Aspirate or decant each well to ensure no fluid',
-  'Invert plate and blot on paper towel',
-  'Add 100ul Enzyme Conjugate to each well',
-  'Incubate plate at 37C for 30min',
-  'Repeat 4-6 times (this is a "wash" recipe again):',
-  '  - Add 200-300ul washing buffer to each well',
-  '  - Discard solution in each well',
-  'Add 100ul of Substrate (TMB) Solution to each well',
-  'Incubate at 37C for 15min (protect from light)',
-  'Add 100ul of Stop Solution to each well and mix *well*',
-  'Read absorbance at 450nm within 30min after adding '
-];
+  $scope.liquids = [
+    'Liquid A',
+    'Liquid B'
+  ];
 
-var parser = require('./lib/steps');
-parser.use(/(\w+)\s(\w+)[^\d]+(\d+C)[^\d]+(\d+min)/, function(_, action, object, temperature, duration){
-  return {
-    action: action, 
-    object: object, 
-    temperature: temperature,
-    duration: duration
-  }
-});
+  $scope.selectWells = function(){
+    $scope.view = 'step';
+    $scope.activeVariable = null;
+  };
 
-console.log(parser(steps[0]));
+  $scope.selectValue = function(liquid){
+    $scope.view = 'step';
+    $scope.activeVariable.value = liquid;
+    $scope.activeVariable = null;
+  };
 
-/**
- * Template.
- */
+  $scope.showVariable = function(variable) {
+    // don't change screen if it's simple
+    if ('number' == variable.type) return;
+    $scope.view = 'variable';
+    $scope.activeVariable = variable;
+  };
 
-template(document.body)({
-  steps: steps
+  $scope.showStep = function(step){
+    $scope.view = 'step';
+    $scope.activeStep = step;
+  };
+
+  $scope.showSteps = function(){
+    $scope.view = 'steps';
+    $scope.activeStep = null;
+  };
+
+  $scope.run = function(){
+    agent.post('/run')
+      .send($scope.steps)
+      .end(function(res){
+        console.log(res.body);
+      });
+  };
 });
 
 /**
@@ -109,7 +112,7 @@ var paused = false;
 var videostream;
 var gif = 'data:image/gif;base64,R0lGODlhEAAJAIAAAP///wAAACH5BAEAAAAALAAAAAAQAAkAAAIKhI+py+0Po5yUFQA7';
 document.querySelector('.snapshot').src = gif;
-events.bind(window, 'click', function(e){
+events.bind(window, 'clicks', function(e){
   if (e.target.tagName.toLowerCase() == 'input') return;
   if (paused) {
     document.querySelector('.snapshot').src = gif;

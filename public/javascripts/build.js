@@ -1796,15 +1796,18 @@ module.exports = request;\n\
 //@ sourceURL=visionmedia-superagent/lib/client.js"
 ));
 require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
-"/* svg.js v1.0rc2-15-g3754d89 - svg regex default color array pointarray patharray number viewbox bbox rbox element parent container fx relative event defs group arrange mask clip gradient doc shape use rect ellipse line poly path image text textpath nested hyperlink sugar set data memory loader - svgjs.com/license */\n\
+"/* svg.js 1.0.0-rc.4-9-g6841c32 - svg inventor regex default color array pointarray patharray number viewbox bbox rbox element parent container fx relative event defs group arrange mask clip gradient pattern doc shape use rect ellipse line poly path image text textpath nested hyperlink sugar set data memory loader - svgjs.com/license */\n\
 ;(function() {\n\
 \n\
   this.SVG = function(element) {\n\
-    if (!SVG.parser)\n\
-      SVG.prepare()\n\
+    if (SVG.supported) {\n\
+      element = new SVG.Doc(element)\n\
   \n\
-    if (SVG.supported)\n\
-      return new SVG.Doc(element)\n\
+      if (!SVG.parser)\n\
+        SVG.prepare(element)\n\
+  \n\
+      return element\n\
+    }\n\
   }\n\
   \n\
   // Default namespaces\n\
@@ -1858,15 +1861,15 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   }\n\
   \n\
   // Initialize parsing element\n\
-  SVG.prepare = function() {\n\
-    /* select document body and create svg element*/\n\
-    var body = document.getElementsByTagName('body')[0] || document.getElementsByTagName('svg')[0]\n\
-      , draw = new SVG.Doc(body).size(2, 2).style('opacity:0;position:fixed;left:100%;top:100%;')\n\
+  SVG.prepare = function(element) {\n\
+    /* select document body and create invisible svg element */\n\
+    var body = document.getElementsByTagName('body')[0]\n\
+      , draw = (body ? new SVG.Doc(body) : element.nested()).size(2, 2)\n\
   \n\
     /* create parser object */\n\
     SVG.parser = {\n\
-      body: body\n\
-    , draw: draw\n\
+      body: body || element.parent\n\
+    , draw: draw.style('opacity:0;position:fixed;left:100%;top:100%;overflow:hidden')\n\
     , poly: draw.polygon().node\n\
     , path: draw.path().node\n\
     }\n\
@@ -1879,6 +1882,29 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   })()\n\
   \n\
   if (!SVG.supported) return false\n\
+\n\
+  SVG.invent = function(config) {\n\
+  \t/* create element initializer */\n\
+  \tvar initializer = typeof config.create == 'function' ?\n\
+  \t\tconfig.create :\n\
+  \t\tfunction() {\n\
+  \t\t\tthis.constructor.call(this, SVG.create(config.create))\n\
+  \t\t}\n\
+  \n\
+  \t/* inherit prototype */\n\
+  \tif (config.inherit)\n\
+  \t\tinitializer.prototype = new config.inherit\n\
+  \n\
+  \t/* extend with methods */\n\
+  \tif (config.extend)\n\
+  \t\tSVG.extend(initializer, config.extend)\n\
+  \n\
+  \t/* attach construct method to parent */\n\
+  \tif (config.construct)\n\
+  \t\tSVG.extend(config.parent || SVG.Container, config.construct)\n\
+  \n\
+  \treturn initializer\n\
+  }\n\
 \n\
   SVG.regex = {\n\
     /* test a given value */\n\
@@ -1915,6 +1941,9 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
     /* test for percent value */\n\
   , isPercent:    /^-?[\\d\\.]+%$/\n\
+  \n\
+    /* test for image url */\n\
+  , isImage:      /\\.(jpg|jpeg|png|gif)(\\?[^=]+.*)?/i\n\
     \n\
   }\n\
 \n\
@@ -2294,11 +2323,11 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
           break\n\
           case 'A':\n\
             s.push(\n\
-              this.value[i].rx\n\
-            , this.value[i].ry\n\
-            , this.value[i].angle\n\
-            , this.value[i].largeArcFlag\n\
-            , this.value[i].sweepFlag\n\
+              this.value[i].r1\n\
+            , this.value[i].r2\n\
+            , this.value[i].a\n\
+            , this.value[i].l\n\
+            , this.value[i].s\n\
             , this.value[i].x\n\
             , this.value[i].y\n\
             )\n\
@@ -2406,8 +2435,8 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
           break\n\
           case 'A':\n\
             /* resize radii */\n\
-            this.value[i].values.rx = (this.value[i].values.rx * width)  / box.width\n\
-            this.value[i].values.ry = (this.value[i].values.ry * height) / box.height\n\
+            this.value[i].values.r1 = (this.value[i].values.r1 * width)  / box.width\n\
+            this.value[i].values.r2 = (this.value[i].values.r2 * height) / box.height\n\
   \n\
             /* move position values */\n\
             this.value[i].values.x = ((this.value[i].values.x - box.x) * width)  / box.width  + box.x\n\
@@ -2526,8 +2555,8 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
               r1: seg.r1\n\
             , r2: seg.r2\n\
             , a:  seg.angle\n\
-            , l:  seg.largeArcFlag\n\
-            , s:  seg.sweepFlag\n\
+            , l:  seg.largeArcFlag|0\n\
+            , s:  seg.sweepFlag|0\n\
             }\n\
           break\n\
         }\n\
@@ -2545,8 +2574,6 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     }\n\
     // Get bounding box of path\n\
   , bbox: function() {\n\
-  \t\tif (this._cachedBBox) return this._cachedBBox\n\
-  \n\
       SVG.parser.path.setAttribute('d', this.toString())\n\
   \n\
       return SVG.parser.path.getBBox()\n\
@@ -2576,6 +2603,8 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
           /* normalize percent value */\n\
           if (match[2] == '%')\n\
             this.value /= 100\n\
+          else if (match[2] == 's')\n\
+            this.value *= 1000\n\
       \n\
           /* store unit */\n\
           this.unit = match[2]\n\
@@ -2594,7 +2623,13 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   SVG.extend(SVG.Number, {\n\
     // Stringalize\n\
     toString: function() {\n\
-      return (this.unit == '%' ? ~~(this.value * 1e8) / 1e6 : this.value) + this.unit\n\
+      return (\n\
+        this.unit == '%' ?\n\
+          ~~(this.value * 1e8) / 1e6:\n\
+        this.unit == 's' ?\n\
+          this.value / 1e3 :\n\
+          this.value\n\
+      ) + this.unit\n\
     }\n\
   , // Convert to primitive\n\
     valueOf: function() {\n\
@@ -2842,548 +2877,570 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
   })\n\
 \n\
-  SVG.Element = function(node) {\n\
-    /* make stroke value accessible dynamically */\n\
-    this._stroke = SVG.defaults.attrs.stroke\n\
-    \n\
-    /* initialize style store */\n\
-    this.styles = {}\n\
-    \n\
-    /* initialize transformation store with defaults */\n\
-    this.trans = SVG.defaults.trans()\n\
-    \n\
-    /* keep reference to the element node */\n\
-    if (this.node = node) {\n\
-      this.type = node.nodeName\n\
-      this.node.instance = this\n\
-    }\n\
-  }\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Element, {\n\
-    // Move over x-axis\n\
-    x: function(x) {\n\
-      if (x) {\n\
-        x = new SVG.Number(x)\n\
-        x.value /= this.trans.scaleX\n\
+  SVG.Element = SVG.invent({\n\
+    // Initialize node\n\
+    create: function(node) {\n\
+      /* make stroke value accessible dynamically */\n\
+      this._stroke = SVG.defaults.attrs.stroke\n\
+      \n\
+      /* initialize style store */\n\
+      this.styles = {}\n\
+      \n\
+      /* initialize transformation store with defaults */\n\
+      this.trans = SVG.defaults.trans()\n\
+      \n\
+      /* keep reference to the element node */\n\
+      if (this.node = node) {\n\
+        this.type = node.nodeName\n\
+        this.node.instance = this\n\
       }\n\
-      return this.attr('x', x)\n\
     }\n\
-    // Move over y-axis\n\
-  , y: function(y) {\n\
-      if (y) {\n\
-        y = new SVG.Number(y)\n\
-        y.value /= this.trans.scaleY\n\
-      }\n\
-      return this.attr('y', y)\n\
-    }\n\
-    // Move by center over x-axis\n\
-  , cx: function(x) {\n\
-      return x == null ? this.x() + this.width() / 2 : this.x(x - this.width() / 2)\n\
-    }\n\
-    // Move by center over y-axis\n\
-  , cy: function(y) {\n\
-      return y == null ? this.y() + this.height() / 2 : this.y(y - this.height() / 2)\n\
-    }\n\
-    // Move element to given x and y values\n\
-  , move: function(x, y) {\n\
-      return this.x(x).y(y)\n\
-    }\n\
-    // Move element by its center\n\
-  , center: function(x, y) {\n\
-      return this.cx(x).cy(y)\n\
-    }\n\
-    // Set width of element\n\
-  , width: function(width) {\n\
-      return this.attr('width', width)\n\
-    }\n\
-    // Set height of element\n\
-  , height: function(height) {\n\
-      return this.attr('height', height)\n\
-    }\n\
-    // Set element size to given width and height\n\
-  , size: function(width, height) {\n\
-      var p = this._proportionalSize(width, height)\n\
   \n\
-      return this.attr({\n\
-        width:  new SVG.Number(p.width)\n\
-      , height: new SVG.Number(p.height)\n\
-      })\n\
-    }\n\
-    // Clone element\n\
-  , clone: function() {\n\
-      var clone , attr\n\
-        , type = this.type\n\
-      \n\
-      /* invoke shape method with shape-specific arguments */\n\
-      clone = type == 'rect' || type == 'ellipse' ?\n\
-        this.parent[type](0,0) :\n\
-      type == 'line' ?\n\
-        this.parent[type](0,0,0,0) :\n\
-      type == 'image' ?\n\
-        this.parent[type](this.src) :\n\
-      type == 'text' ?\n\
-        this.parent[type](this.content) :\n\
-      type == 'path' ?\n\
-        this.parent[type](this.attr('d')) :\n\
-      type == 'polyline' || type == 'polygon' ?\n\
-        this.parent[type](this.attr('points')) :\n\
-      type == 'g' ?\n\
-        this.parent.group() :\n\
-        this.parent[type]()\n\
-      \n\
-      /* apply attributes attributes */\n\
-      attr = this.attr()\n\
-      delete attr.id\n\
-      clone.attr(attr)\n\
-      \n\
-      /* copy transformations */\n\
-      clone.trans = this.trans\n\
-      \n\
-      /* apply attributes and translations */\n\
-      return clone.transform({})\n\
-    }\n\
-    // Remove element\n\
-  , remove: function() {\n\
-      if (this.parent)\n\
-        this.parent.removeElement(this)\n\
-      \n\
-      return this\n\
-    }\n\
-    // Replace element\n\
-  , replace: function(element) {\n\
-      this.after(element).remove()\n\
-  \n\
-      return element\n\
-    }\n\
-    // Add element to given container and return self\n\
-  , addTo: function(parent) {\n\
-      return parent.put(this)\n\
-    }\n\
-    // Add element to given container and return container\n\
-  , putIn: function(parent) {\n\
-      return parent.add(this)\n\
-    }\n\
-    // Get parent document\n\
-  , doc: function(type) {\n\
-      return this._parent(type || SVG.Doc)\n\
-    }\n\
-    // Set svg element attribute\n\
-  , attr: function(a, v, n) {\n\
-      if (a == null) {\n\
-        /* get an object of attributes */\n\
-        a = {}\n\
-        v = this.node.attributes\n\
-        for (n = v.length - 1; n >= 0; n--)\n\
-          a[v[n].nodeName] = SVG.regex.test(v[n].nodeValue, 'isNumber') ? parseFloat(v[n].nodeValue) : v[n].nodeValue\n\
-        \n\
-        return a\n\
-        \n\
-      } else if (typeof a == 'object') {\n\
-        /* apply every attribute individually if an object is passed */\n\
-        for (v in a) this.attr(v, a[v])\n\
-        \n\
-      } else if (v === null) {\n\
-          /* remove value */\n\
-          this.node.removeAttribute(a)\n\
-        \n\
-      } else if (v == null) {\n\
-        /* act as a getter for style attributes */\n\
-        if (this._isStyle(a)) {\n\
-          return a == 'text' ?\n\
-                   this.content :\n\
-                 a == 'leading' && this.leading ?\n\
-                   this.leading() :\n\
-                   this.style(a)\n\
-        \n\
-        /* act as a getter if the first and only argument is not an object */\n\
-        } else {\n\
-          v = this.node.getAttribute(a)\n\
-          return v == null ? \n\
-            SVG.defaults.attrs[a] :\n\
-          SVG.regex.test(v, 'isNumber') ?\n\
-            parseFloat(v) : v\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Move over x-axis\n\
+      x: function(x) {\n\
+        if (x) {\n\
+          x = new SVG.Number(x)\n\
+          x.value /= this.trans.scaleX\n\
         }\n\
-      \n\
-      } else if (a == 'style') {\n\
-        /* redirect to the style method */\n\
-        return this.style(v)\n\
-      \n\
-      } else {\n\
-        /* treat x differently on text elements */\n\
-        if (a == 'x' && Array.isArray(this.lines))\n\
-          for (n = this.lines.length - 1; n >= 0; n--)\n\
-            this.lines[n].attr(a, v)\n\
-        \n\
-        /* BUG FIX: some browsers will render a stroke if a color is given even though stroke width is 0 */\n\
-        if (a == 'stroke-width')\n\
-          this.attr('stroke', parseFloat(v) > 0 ? this._stroke : null)\n\
-        else if (a == 'stroke')\n\
-          this._stroke = v\n\
-        \n\
-        /* ensure full hex color */\n\
-        if (SVG.Color.test(v) || SVG.Color.isRgb(v))\n\
-          v = new SVG.Color(v)\n\
+        return this.attr('x', x)\n\
+      }\n\
+      // Move over y-axis\n\
+    , y: function(y) {\n\
+        if (y) {\n\
+          y = new SVG.Number(y)\n\
+          y.value /= this.trans.scaleY\n\
+        }\n\
+        return this.attr('y', y)\n\
+      }\n\
+      // Move by center over x-axis\n\
+    , cx: function(x) {\n\
+        return x == null ? this.x() + this.width() / 2 : this.x(x - this.width() / 2)\n\
+      }\n\
+      // Move by center over y-axis\n\
+    , cy: function(y) {\n\
+        return y == null ? this.y() + this.height() / 2 : this.y(y - this.height() / 2)\n\
+      }\n\
+      // Move element to given x and y values\n\
+    , move: function(x, y) {\n\
+        return this.x(x).y(y)\n\
+      }\n\
+      // Move element by its center\n\
+    , center: function(x, y) {\n\
+        return this.cx(x).cy(y)\n\
+      }\n\
+      // Set width of element\n\
+    , width: function(width) {\n\
+        return this.attr('width', width)\n\
+      }\n\
+      // Set height of element\n\
+    , height: function(height) {\n\
+        return this.attr('height', height)\n\
+      }\n\
+      // Set element size to given width and height\n\
+    , size: function(width, height) {\n\
+        var p = this._proportionalSize(width, height)\n\
   \n\
-        /* ensure correct numeric values */\n\
-        else if (typeof v === 'number')\n\
-          v = new SVG.Number(v)\n\
-  \n\
-        /* parse array values */\n\
-        else if (Array.isArray(v))\n\
-          v = new SVG.Array(v)\n\
-  \n\
-        /* set give attribute on node */\n\
-        n != null ?\n\
-          this.node.setAttributeNS(n, a, v.toString()) :\n\
-          this.node.setAttribute(a, v.toString())\n\
+        return this.attr({\n\
+          width:  new SVG.Number(p.width)\n\
+        , height: new SVG.Number(p.height)\n\
+        })\n\
+      }\n\
+      // Clone element\n\
+    , clone: function() {\n\
+        var clone , attr\n\
+          , type = this.type\n\
         \n\
-        /* if the passed argument belongs in the style as well, add it there */\n\
-        if (this._isStyle(a)) {\n\
-          a == 'text' ?\n\
-            this.text(v) :\n\
-          a == 'leading' && this.leading ?\n\
-            this.leading(v) :\n\
-            this.style(a, v)\n\
+        /* invoke shape method with shape-specific arguments */\n\
+        clone = type == 'rect' || type == 'ellipse' ?\n\
+          this.parent[type](0,0) :\n\
+        type == 'line' ?\n\
+          this.parent[type](0,0,0,0) :\n\
+        type == 'image' ?\n\
+          this.parent[type](this.src) :\n\
+        type == 'text' ?\n\
+          this.parent[type](this.content) :\n\
+        type == 'path' ?\n\
+          this.parent[type](this.attr('d')) :\n\
+        type == 'polyline' || type == 'polygon' ?\n\
+          this.parent[type](this.attr('points')) :\n\
+        type == 'g' ?\n\
+          this.parent.group() :\n\
+          this.parent[type]()\n\
+        \n\
+        /* apply attributes attributes */\n\
+        attr = this.attr()\n\
+        delete attr.id\n\
+        clone.attr(attr)\n\
+        \n\
+        /* copy transformations */\n\
+        clone.trans = this.trans\n\
+        \n\
+        /* apply attributes and translations */\n\
+        return clone.transform({})\n\
+      }\n\
+      // Remove element\n\
+    , remove: function() {\n\
+        if (this.parent)\n\
+          this.parent.removeElement(this)\n\
+        \n\
+        return this\n\
+      }\n\
+      // Replace element\n\
+    , replace: function(element) {\n\
+        this.after(element).remove()\n\
+  \n\
+        return element\n\
+      }\n\
+      // Add element to given container and return self\n\
+    , addTo: function(parent) {\n\
+        return parent.put(this)\n\
+      }\n\
+      // Add element to given container and return container\n\
+    , putIn: function(parent) {\n\
+        return parent.add(this)\n\
+      }\n\
+      // Get parent document\n\
+    , doc: function(type) {\n\
+        return this._parent(type || SVG.Doc)\n\
+      }\n\
+      // Set svg element attribute\n\
+    , attr: function(a, v, n) {\n\
+        if (a == null) {\n\
+          /* get an object of attributes */\n\
+          a = {}\n\
+          v = this.node.attributes\n\
+          for (n = v.length - 1; n >= 0; n--)\n\
+            a[v[n].nodeName] = SVG.regex.test(v[n].nodeValue, 'isNumber') ? parseFloat(v[n].nodeValue) : v[n].nodeValue\n\
           \n\
-          /* rebuild if required */\n\
-          if (this.rebuild)\n\
-            this.rebuild(a, v)\n\
-        }\n\
-      }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Manage transformations\n\
-  , transform: function(o, v) {\n\
-      \n\
-      if (arguments.length == 0) {\n\
-        /* act as a getter if no argument is given */\n\
-        return this.trans\n\
-        \n\
-      } else if (typeof o === 'string') {\n\
-        /* act as a getter if only one string argument is given */\n\
-        if (arguments.length < 2)\n\
-          return this.trans[o]\n\
-        \n\
-        /* apply transformations as object if key value arguments are given*/\n\
-        var transform = {}\n\
-        transform[o] = v\n\
-        \n\
-        return this.transform(transform)\n\
-      }\n\
-      \n\
-      /* ... otherwise continue as a setter */\n\
-      var transform = []\n\
-      \n\
-      /* parse matrix */\n\
-      o = this._parseMatrix(o)\n\
-      \n\
-      /* merge values */\n\
-      for (v in o)\n\
-        if (o[v] != null)\n\
-          this.trans[v] = o[v]\n\
-      \n\
-      /* compile matrix */\n\
-      this.trans.matrix = this.trans.a\n\
-                  + ' ' + this.trans.b\n\
-                  + ' ' + this.trans.c\n\
-                  + ' ' + this.trans.d\n\
-                  + ' ' + this.trans.e\n\
-                  + ' ' + this.trans.f\n\
-      \n\
-      /* alias current transformations */\n\
-      o = this.trans\n\
-      \n\
-      /* add matrix */\n\
-      if (o.matrix != SVG.defaults.matrix)\n\
-        transform.push('matrix(' + o.matrix + ')')\n\
-      \n\
-      /* add rotation */\n\
-      if (o.rotation != 0)\n\
-        transform.push('rotate(' + o.rotation + ' ' + (o.cx == null ? this.bbox().cx : o.cx) + ' ' + (o.cy == null ? this.bbox().cy : o.cy) + ')')\n\
-      \n\
-      /* add scale */\n\
-      if (o.scaleX != 1 || o.scaleY != 1)\n\
-        transform.push('scale(' + o.scaleX + ' ' + o.scaleY + ')')\n\
-      \n\
-      /* add skew on x axis */\n\
-      if (o.skewX != 0)\n\
-        transform.push('skewX(' + o.skewX + ')')\n\
-      \n\
-      /* add skew on y axis */\n\
-      if (o.skewY != 0)\n\
-        transform.push('skewY(' + o.skewY + ')')\n\
-      \n\
-      /* add translation */\n\
-      if (o.x != 0 || o.y != 0)\n\
-        transform.push('translate(' + new SVG.Number(o.x / o.scaleX) + ' ' + new SVG.Number(o.y / o.scaleY) + ')')\n\
-      \n\
-      /* update transformations, even if there are none */\n\
-      if (transform.length == 0)\n\
-        this.node.removeAttribute('transform')\n\
-      else\n\
-        this.node.setAttribute('transform', transform.join(' '))\n\
-      \n\
-      return this\n\
-    }\n\
-    // Dynamic style generator\n\
-  , style: function(s, v) {\n\
-      if (arguments.length == 0) {\n\
-        /* get full style */\n\
-        return this.attr('style') || ''\n\
-      \n\
-      } else if (arguments.length < 2) {\n\
-        /* apply every style individually if an object is passed */\n\
-        if (typeof s == 'object') {\n\
-          for (v in s) this.style(v, s[v])\n\
-        \n\
-        } else if (SVG.regex.isCss.test(s)) {\n\
-          /* parse css string */\n\
-          s = s.split(';')\n\
-  \n\
-          /* apply every definition individually */\n\
-          for (var i = 0; i < s.length; i++) {\n\
-            v = s[i].split(':')\n\
-  \n\
-            if (v.length == 2)\n\
-              this.style(v[0].replace(/\\s+/g, ''), v[1].replace(/^\\s+/,'').replace(/\\s+$/,''))\n\
-          }\n\
-        } else {\n\
+          return a\n\
+          \n\
+        } else if (typeof a == 'object') {\n\
+          /* apply every attribute individually if an object is passed */\n\
+          for (v in a) this.attr(v, a[v])\n\
+          \n\
+        } else if (v === null) {\n\
+            /* remove value */\n\
+            this.node.removeAttribute(a)\n\
+          \n\
+        } else if (v == null) {\n\
+          /* act as a getter for style attributes */\n\
+          if (this._isStyle(a)) {\n\
+            return a == 'text' ?\n\
+                     this.content :\n\
+                   a == 'leading' && this.leading ?\n\
+                     this.leading() :\n\
+                     this.style(a)\n\
+          \n\
           /* act as a getter if the first and only argument is not an object */\n\
-          return this.styles[s]\n\
-        }\n\
-      \n\
-      } else if (v === null || SVG.regex.test(v, 'isBlank')) {\n\
-        /* remove value */\n\
-        delete this.styles[s]\n\
+          } else {\n\
+            v = this.node.getAttribute(a)\n\
+            return v == null ? \n\
+              SVG.defaults.attrs[a] :\n\
+            SVG.regex.test(v, 'isNumber') ?\n\
+              parseFloat(v) : v\n\
+          }\n\
         \n\
-      } else {\n\
-        /* store value */\n\
-        this.styles[s] = v\n\
-      }\n\
-      \n\
-      /* rebuild style string */\n\
-      s = ''\n\
-      for (v in this.styles)\n\
-        s += v + ':' + this.styles[v] + ';'\n\
-      \n\
-      /* apply style */\n\
-      if (s == '')\n\
-        this.node.removeAttribute('style')\n\
-      else\n\
-        this.node.setAttribute('style', s)\n\
-      \n\
-      return this\n\
-    }\n\
-    // Get bounding box\n\
-  , bbox: function() {\n\
-      return new SVG.BBox(this)\n\
-    }\n\
-    // Get rect box\n\
-  , rbox: function() {\n\
-      return new SVG.RBox(this)\n\
-    }\n\
-    // Checks whether the given point inside the bounding box of the element\n\
-  , inside: function(x, y) {\n\
-      var box = this.bbox()\n\
-      \n\
-      return x > box.x\n\
-          && y > box.y\n\
-          && x < box.x + box.width\n\
-          && y < box.y + box.height\n\
-    }\n\
-    // Show element\n\
-  , show: function() {\n\
-      return this.style('display', '')\n\
-    }\n\
-    // Hide element\n\
-  , hide: function() {\n\
-      return this.style('display', 'none')\n\
-    }\n\
-    // Is element visible?\n\
-  , visible: function() {\n\
-      return this.style('display') != 'none'\n\
-    }\n\
-    // Return id on string conversion\n\
-  , toString: function() {\n\
-      return this.attr('id')\n\
-    }\n\
-    // Private: find svg parent by instance\n\
-  , _parent: function(parent) {\n\
-      var element = this\n\
-      \n\
-      while (element != null && !(element instanceof parent))\n\
-        element = element.parent\n\
+        } else if (a == 'style') {\n\
+          /* redirect to the style method */\n\
+          return this.style(v)\n\
+        \n\
+        } else {\n\
+          /* treat x differently on text elements */\n\
+          if (a == 'x' && Array.isArray(this.lines))\n\
+            for (n = this.lines.length - 1; n >= 0; n--)\n\
+              this.lines[n].attr(a, v)\n\
+          \n\
+          /* BUG FIX: some browsers will render a stroke if a color is given even though stroke width is 0 */\n\
+          if (a == 'stroke-width')\n\
+            this.attr('stroke', parseFloat(v) > 0 ? this._stroke : null)\n\
+          else if (a == 'stroke')\n\
+            this._stroke = v\n\
   \n\
-      return element\n\
-    }\n\
-    // Private: tester method for style detection\n\
-  , _isStyle: function(a) {\n\
-      return typeof a == 'string' ? SVG.regex.test(a, 'isStyle') : false\n\
-    }\n\
-    // Private: parse a matrix string\n\
-  , _parseMatrix: function(o) {\n\
-      if (o.matrix) {\n\
-        /* split matrix string */\n\
-        var m = o.matrix.replace(/\\s/g, '').split(',')\n\
-        \n\
-        /* pasrse values */\n\
-        if (m.length == 6) {\n\
-          o.a = parseFloat(m[0])\n\
-          o.b = parseFloat(m[1])\n\
-          o.c = parseFloat(m[2])\n\
-          o.d = parseFloat(m[3])\n\
-          o.e = parseFloat(m[4])\n\
-          o.f = parseFloat(m[5])\n\
+          /* convert image fill and stroke to patterns */\n\
+          if (a == 'fill' || a == 'stroke') {\n\
+            if (SVG.regex.isImage.test(v))\n\
+              v = this.doc().defs().image(v, 0, 0)\n\
+  \n\
+            if (v instanceof SVG.Image)\n\
+              v = this.doc().defs().pattern(0, 0, function() {\n\
+                this.add(v)\n\
+              })\n\
+          }\n\
+          \n\
+          /* ensure full hex color */\n\
+          if (SVG.Color.test(v) || SVG.Color.isRgb(v))\n\
+            v = new SVG.Color(v)\n\
+  \n\
+          /* ensure correct numeric values */\n\
+          else if (typeof v === 'number')\n\
+            v = new SVG.Number(v)\n\
+  \n\
+          /* parse array values */\n\
+          else if (Array.isArray(v))\n\
+            v = new SVG.Array(v)\n\
+  \n\
+          /* set give attribute on node */\n\
+          n != null ?\n\
+            this.node.setAttributeNS(n, a, v.toString()) :\n\
+            this.node.setAttribute(a, v.toString())\n\
+          \n\
+          /* if the passed argument belongs in the style as well, add it there */\n\
+          if (this._isStyle(a)) {\n\
+            a == 'text' ?\n\
+              this.text(v) :\n\
+            a == 'leading' && this.leading ?\n\
+              this.leading(v) :\n\
+              this.style(a, v)\n\
+            \n\
+            /* rebuild if required */\n\
+            if (this.rebuild)\n\
+              this.rebuild(a, v)\n\
+          }\n\
         }\n\
+        \n\
+        return this\n\
       }\n\
-      \n\
-      return o\n\
-    }\n\
-    // Private: calculate proportional width and height values when necessary\n\
-  , _proportionalSize: function(width, height) {\n\
-      if (width == null || height == null) {\n\
+      // Manage transformations\n\
+    , transform: function(o, v) {\n\
+        \n\
+        if (arguments.length == 0) {\n\
+          /* act as a getter if no argument is given */\n\
+          return this.trans\n\
+          \n\
+        } else if (typeof o === 'string') {\n\
+          /* act as a getter if only one string argument is given */\n\
+          if (arguments.length < 2)\n\
+            return this.trans[o]\n\
+          \n\
+          /* apply transformations as object if key value arguments are given*/\n\
+          var transform = {}\n\
+          transform[o] = v\n\
+          \n\
+          return this.transform(transform)\n\
+        }\n\
+        \n\
+        /* ... otherwise continue as a setter */\n\
+        var transform = []\n\
+        \n\
+        /* parse matrix */\n\
+        o = this._parseMatrix(o)\n\
+        \n\
+        /* merge values */\n\
+        for (v in o)\n\
+          if (o[v] != null)\n\
+            this.trans[v] = o[v]\n\
+        \n\
+        /* compile matrix */\n\
+        this.trans.matrix = this.trans.a\n\
+                    + ' ' + this.trans.b\n\
+                    + ' ' + this.trans.c\n\
+                    + ' ' + this.trans.d\n\
+                    + ' ' + this.trans.e\n\
+                    + ' ' + this.trans.f\n\
+        \n\
+        /* alias current transformations */\n\
+        o = this.trans\n\
+        \n\
+        /* add matrix */\n\
+        if (o.matrix != SVG.defaults.matrix)\n\
+          transform.push('matrix(' + o.matrix + ')')\n\
+        \n\
+        /* add rotation */\n\
+        if (o.rotation != 0)\n\
+          transform.push('rotate(' + o.rotation + ' ' + (o.cx == null ? this.bbox().cx : o.cx) + ' ' + (o.cy == null ? this.bbox().cy : o.cy) + ')')\n\
+        \n\
+        /* add scale */\n\
+        if (o.scaleX != 1 || o.scaleY != 1)\n\
+          transform.push('scale(' + o.scaleX + ' ' + o.scaleY + ')')\n\
+        \n\
+        /* add skew on x axis */\n\
+        if (o.skewX != 0)\n\
+          transform.push('skewX(' + o.skewX + ')')\n\
+        \n\
+        /* add skew on y axis */\n\
+        if (o.skewY != 0)\n\
+          transform.push('skewY(' + o.skewY + ')')\n\
+        \n\
+        /* add translation */\n\
+        if (o.x != 0 || o.y != 0)\n\
+          transform.push('translate(' + new SVG.Number(o.x / o.scaleX) + ' ' + new SVG.Number(o.y / o.scaleY) + ')')\n\
+        \n\
+        /* update transformations, even if there are none */\n\
+        if (transform.length == 0)\n\
+          this.node.removeAttribute('transform')\n\
+        else\n\
+          this.node.setAttribute('transform', transform.join(' '))\n\
+        \n\
+        return this\n\
+      }\n\
+      // Dynamic style generator\n\
+    , style: function(s, v) {\n\
+        if (arguments.length == 0) {\n\
+          /* get full style */\n\
+          return this.attr('style') || ''\n\
+        \n\
+        } else if (arguments.length < 2) {\n\
+          /* apply every style individually if an object is passed */\n\
+          if (typeof s == 'object') {\n\
+            for (v in s) this.style(v, s[v])\n\
+          \n\
+          } else if (SVG.regex.isCss.test(s)) {\n\
+            /* parse css string */\n\
+            s = s.split(';')\n\
+  \n\
+            /* apply every definition individually */\n\
+            for (var i = 0; i < s.length; i++) {\n\
+              v = s[i].split(':')\n\
+  \n\
+              if (v.length == 2)\n\
+                this.style(v[0].replace(/\\s+/g, ''), v[1].replace(/^\\s+/,'').replace(/\\s+$/,''))\n\
+            }\n\
+          } else {\n\
+            /* act as a getter if the first and only argument is not an object */\n\
+            return this.styles[s]\n\
+          }\n\
+        \n\
+        } else if (v === null || SVG.regex.test(v, 'isBlank')) {\n\
+          /* remove value */\n\
+          delete this.styles[s]\n\
+          \n\
+        } else {\n\
+          /* store value */\n\
+          this.styles[s] = v\n\
+        }\n\
+        \n\
+        /* rebuild style string */\n\
+        s = ''\n\
+        for (v in this.styles)\n\
+          s += v + ':' + this.styles[v] + ';'\n\
+        \n\
+        /* apply style */\n\
+        if (s == '')\n\
+          this.node.removeAttribute('style')\n\
+        else\n\
+          this.node.setAttribute('style', s)\n\
+        \n\
+        return this\n\
+      }\n\
+      // Get bounding box\n\
+    , bbox: function() {\n\
+        return new SVG.BBox(this)\n\
+      }\n\
+      // Get rect box\n\
+    , rbox: function() {\n\
+        return new SVG.RBox(this)\n\
+      }\n\
+      // Checks whether the given point inside the bounding box of the element\n\
+    , inside: function(x, y) {\n\
         var box = this.bbox()\n\
-  \n\
-        if (height == null)\n\
-          height = box.height / box.width * width\n\
-        else if (width == null)\n\
-          width = box.width / box.height * height\n\
+        \n\
+        return x > box.x\n\
+            && y > box.y\n\
+            && x < box.x + box.width\n\
+            && y < box.y + box.height\n\
       }\n\
-      \n\
-      return {\n\
-        width:  width\n\
-      , height: height\n\
+      // Show element\n\
+    , show: function() {\n\
+        return this.style('display', '')\n\
+      }\n\
+      // Hide element\n\
+    , hide: function() {\n\
+        return this.style('display', 'none')\n\
+      }\n\
+      // Is element visible?\n\
+    , visible: function() {\n\
+        return this.style('display') != 'none'\n\
+      }\n\
+      // Return id on string conversion\n\
+    , toString: function() {\n\
+        return this.attr('id')\n\
+      }\n\
+      // Private: find svg parent by instance\n\
+    , _parent: function(parent) {\n\
+        var element = this\n\
+        \n\
+        while (element != null && !(element instanceof parent))\n\
+          element = element.parent\n\
+  \n\
+        return element\n\
+      }\n\
+      // Private: tester method for style detection\n\
+    , _isStyle: function(a) {\n\
+        return typeof a == 'string' ? SVG.regex.test(a, 'isStyle') : false\n\
+      }\n\
+      // Private: parse a matrix string\n\
+    , _parseMatrix: function(o) {\n\
+        if (o.matrix) {\n\
+          /* split matrix string */\n\
+          var m = o.matrix.replace(/\\s/g, '').split(',')\n\
+          \n\
+          /* pasrse values */\n\
+          if (m.length == 6) {\n\
+            o.a = parseFloat(m[0])\n\
+            o.b = parseFloat(m[1])\n\
+            o.c = parseFloat(m[2])\n\
+            o.d = parseFloat(m[3])\n\
+            o.e = parseFloat(m[4])\n\
+            o.f = parseFloat(m[5])\n\
+          }\n\
+        }\n\
+        \n\
+        return o\n\
+      }\n\
+      // Private: calculate proportional width and height values when necessary\n\
+    , _proportionalSize: function(width, height) {\n\
+        if (width == null || height == null) {\n\
+          var box = this.bbox()\n\
+  \n\
+          if (height == null)\n\
+            height = box.height / box.width * width\n\
+          else if (width == null)\n\
+            width = box.width / box.height * height\n\
+        }\n\
+        \n\
+        return {\n\
+          width:  width\n\
+        , height: height\n\
+        }\n\
       }\n\
     }\n\
     \n\
   })\n\
 \n\
-  SVG.Parent = function(element) {\n\
-    this.constructor.call(this, element)\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Element\n\
-  SVG.Parent.prototype = new SVG.Element\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Parent, {\n\
-  \t// Returns all child elements\n\
-    children: function() {\n\
-      return this._children || (this._children = [])\n\
+  SVG.Parent = SVG.invent({\n\
+    // Initialize node\n\
+    create: function(element) {\n\
+      this.constructor.call(this, element)\n\
     }\n\
-    // Add given element at a position\n\
-  , add: function(element, i) {\n\
-      if (!this.has(element)) {\n\
-        /* define insertion index if none given */\n\
-        i = i == null ? this.children().length : i\n\
+  \n\
+    // Inherit from\n\
+  , inherit: SVG.Element\n\
+  \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Returns all child elements\n\
+      children: function() {\n\
+        return this._children || (this._children = [])\n\
+      }\n\
+      // Add given element at a position\n\
+    , add: function(element, i) {\n\
+        if (!this.has(element)) {\n\
+          /* define insertion index if none given */\n\
+          i = i == null ? this.children().length : i\n\
+          \n\
+          /* remove references from previous parent */\n\
+          if (element.parent)\n\
+            element.parent.children().splice(element.parent.index(element), 1)\n\
+          \n\
+          /* add element references */\n\
+          this.children().splice(i, 0, element)\n\
+          this.node.insertBefore(element.node, this.node.childNodes[i] || null)\n\
+          element.parent = this\n\
+        }\n\
+  \n\
+        /* reposition defs */\n\
+        if (this._defs) {\n\
+          this.node.removeChild(this._defs.node)\n\
+          this.node.appendChild(this._defs.node)\n\
+        }\n\
         \n\
-        /* remove references from previous parent */\n\
-        if (element.parent)\n\
-          element.parent.children().splice(element.parent.index(element), 1)\n\
+        return this\n\
+      }\n\
+      // Basically does the same as `add()` but returns the added element instead\n\
+    , put: function(element, i) {\n\
+        this.add(element, i)\n\
+        return element\n\
+      }\n\
+      // Checks if the given element is a child\n\
+    , has: function(element) {\n\
+        return this.index(element) >= 0\n\
+      }\n\
+      // Gets index of given element\n\
+    , index: function(element) {\n\
+        return this.children().indexOf(element)\n\
+      }\n\
+      // Get a element at the given index\n\
+    , get: function(i) {\n\
+        return this.children()[i]\n\
+      }\n\
+      // Get first child, skipping the defs node\n\
+    , first: function() {\n\
+        return this.children()[0]\n\
+      }\n\
+      // Get the last child\n\
+    , last: function() {\n\
+        return this.children()[this.children().length - 1]\n\
+      }\n\
+      // Iterates over all children and invokes a given block\n\
+    , each: function(block, deep) {\n\
+        var i, il\n\
+          , children = this.children()\n\
         \n\
-        /* add element references */\n\
-        this.children().splice(i, 0, element)\n\
-        this.node.insertBefore(element.node, this.node.childNodes[i] || null)\n\
-        element.parent = this\n\
-      }\n\
+        for (i = 0, il = children.length; i < il; i++) {\n\
+          if (children[i] instanceof SVG.Element)\n\
+            block.apply(children[i], [i, children])\n\
   \n\
-      /* reposition defs */\n\
-      if (this._defs) {\n\
-        this.node.removeChild(this._defs.node)\n\
-        this.node.appendChild(this._defs.node)\n\
+          if (deep && (children[i] instanceof SVG.Container))\n\
+            children[i].each(block, deep)\n\
+        }\n\
+      \n\
+        return this\n\
       }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Basically does the same as `add()` but returns the added element instead\n\
-  , put: function(element, i) {\n\
-      this.add(element, i)\n\
-      return element\n\
-    }\n\
-    // Checks if the given element is a child\n\
-  , has: function(element) {\n\
-      return this.index(element) >= 0\n\
-    }\n\
-    // Gets index of given element\n\
-  , index: function(element) {\n\
-      return this.children().indexOf(element)\n\
-    }\n\
-    // Get a element at the given index\n\
-  , get: function(i) {\n\
-      return this.children()[i]\n\
-    }\n\
-    // Get first child, skipping the defs node\n\
-  , first: function() {\n\
-      return this.children()[0]\n\
-    }\n\
-    // Get the last child\n\
-  , last: function() {\n\
-      return this.children()[this.children().length - 1]\n\
-    }\n\
-    // Iterates over all children and invokes a given block\n\
-  , each: function(block, deep) {\n\
-      var i, il\n\
-        , children = this.children()\n\
-      \n\
-      for (i = 0, il = children.length; i < il; i++) {\n\
-        if (children[i] instanceof SVG.Element)\n\
-          block.apply(children[i], [i, children])\n\
+      // Remove a child element at a position\n\
+    , removeElement: function(element) {\n\
+        this.children().splice(this.index(element), 1)\n\
+        this.node.removeChild(element.node)\n\
+        element.parent = null\n\
+        \n\
+        return this\n\
+      }\n\
+      // Remove all elements in this container\n\
+    , clear: function() {\n\
+        /* remove children */\n\
+        for (var i = this.children().length - 1; i >= 0; i--)\n\
+          this.removeElement(this.children()[i])\n\
   \n\
-        if (deep && (children[i] instanceof SVG.Container))\n\
-          children[i].each(block, deep)\n\
+        /* remove defs node */\n\
+        if (this._defs)\n\
+          this._defs.clear()\n\
+  \n\
+        return this\n\
       }\n\
+     , // Get defs\n\
+      defs: function() {\n\
+        return this.doc().defs()\n\
+      }\n\
+    }\n\
     \n\
-      return this\n\
-    }\n\
-    // Remove a child element at a position\n\
-  , removeElement: function(element) {\n\
-      this.children().splice(this.index(element), 1)\n\
-      this.node.removeChild(element.node)\n\
-      element.parent = null\n\
-      \n\
-      return this\n\
-    }\n\
-    // Remove all elements in this container\n\
-  , clear: function() {\n\
-      /* remove children */\n\
-      for (var i = this.children().length - 1; i >= 0; i--)\n\
-        this.removeElement(this.children()[i])\n\
-  \n\
-      /* remove defs node */\n\
-      if (this._defs)\n\
-        this._defs.clear()\n\
-  \n\
-      return this\n\
-    }\n\
-   , // Get defs\n\
-    defs: function() {\n\
-      return this.doc().defs()\n\
-    }\n\
   })\n\
 \n\
-  SVG.Container = function(element) {\n\
-    this.constructor.call(this, element)\n\
-  }\n\
+\n\
+  SVG.Container = SVG.invent({\n\
+    // Initialize node\n\
+    create: function(element) {\n\
+      this.constructor.call(this, element)\n\
+    }\n\
   \n\
-  // Inherit from SVG.Parent\n\
-  SVG.Container.prototype = new SVG.Parent\n\
+    // Inherit from\n\
+  , inherit: SVG.Parent\n\
   \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Get the viewBox and calculate the zoom value\n\
-    viewbox: function(v) {\n\
-      if (arguments.length == 0)\n\
-        /* act as a getter if there are no arguments */\n\
-        return new SVG.ViewBox(this)\n\
-      \n\
-      /* otherwise act as a setter */\n\
-      v = arguments.length == 1 ?\n\
-        [v.x, v.y, v.width, v.height] :\n\
-        [].slice.call(arguments)\n\
-      \n\
-      return this.attr('viewBox', v)\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Get the viewBox and calculate the zoom value\n\
+      viewbox: function(v) {\n\
+        if (arguments.length == 0)\n\
+          /* act as a getter if there are no arguments */\n\
+          return new SVG.ViewBox(this)\n\
+        \n\
+        /* otherwise act as a setter */\n\
+        v = arguments.length == 1 ?\n\
+          [v.x, v.y, v.width, v.height] :\n\
+          [].slice.call(arguments)\n\
+        \n\
+        return this.attr('viewBox', v)\n\
+      }\n\
     }\n\
     \n\
   })\n\
@@ -3408,7 +3465,7 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
       }\n\
   \n\
       /* ensure default duration and easing */\n\
-      d = d == null ? 1000 : d\n\
+      d = d == '=' ? d : d == null ? 1000 : new SVG.Number(d).valueOf()\n\
       ease = ease || '<>'\n\
   \n\
       /* process values */\n\
@@ -3580,7 +3637,7 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
           /* start animation */\n\
           fx.render()\n\
           \n\
-        }, delay || 0)\n\
+        }, new SVG.Number(delay).valueOf())\n\
       }\n\
       \n\
       return this\n\
@@ -3923,48 +3980,48 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     }\n\
   })\n\
 \n\
-  SVG.Defs = function() {\n\
-    this.constructor.call(this, SVG.create('defs'))\n\
-  }\n\
+  SVG.Defs = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'defs'\n\
   \n\
-  // Inherits from SVG.Container\n\
-  SVG.Defs.prototype = new SVG.Container\n\
-\n\
-  SVG.G = function() {\n\
-    this.constructor.call(this, SVG.create('g'))\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Container\n\
-  SVG.G.prototype = new SVG.Container\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.G, {\n\
-    // Move over x-axis\n\
-    x: function(x) {\n\
-      return x == null ? this.trans.x : this.transform('x', x)\n\
-    }\n\
-    // Move over y-axis\n\
-  , y: function(y) {\n\
-      return y == null ? this.trans.y : this.transform('y', y)\n\
-    }\n\
-    // Move by center over x-axis\n\
-  , cx: function(x) {\n\
-      return x == null ? this.bbox().cx : this.x(x - this.bbox().width / 2)\n\
-    }\n\
-    // Move by center over y-axis\n\
-  , cy: function(y) {\n\
-      return y == null ? this.bbox().cy : this.y(y - this.bbox().height / 2)\n\
-    }\n\
-    \n\
+    // Inherit from\n\
+  , inherit: SVG.Container\n\
   })\n\
+\n\
+  SVG.G = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'g'\n\
   \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create a group element\n\
-    group: function() {\n\
-      return this.put(new SVG.G)\n\
+    // Inherit from\n\
+  , inherit: SVG.Container\n\
+    \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Move over x-axis\n\
+      x: function(x) {\n\
+        return x == null ? this.trans.x : this.transform('x', x)\n\
+      }\n\
+      // Move over y-axis\n\
+    , y: function(y) {\n\
+        return y == null ? this.trans.y : this.transform('y', y)\n\
+      }\n\
+      // Move by center over x-axis\n\
+    , cx: function(x) {\n\
+        return x == null ? this.bbox().cx : this.x(x - this.bbox().width / 2)\n\
+      }\n\
+      // Move by center over y-axis\n\
+    , cy: function(y) {\n\
+        return y == null ? this.bbox().cy : this.y(y - this.bbox().height / 2)\n\
+      }\n\
     }\n\
     \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create a group element\n\
+      group: function() {\n\
+        return this.put(new SVG.G)\n\
+      }\n\
+    }\n\
   })\n\
 \n\
   SVG.extend(SVG.Element, {\n\
@@ -4032,34 +4089,45 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
   })\n\
 \n\
-  SVG.Mask = function() {\n\
-    this.constructor.call(this, SVG.create('mask'))\n\
+  SVG.Mask = SVG.invent({\n\
+    // Initialize node\n\
+    create: function() {\n\
+      this.constructor.call(this, SVG.create('mask'))\n\
   \n\
-    /* keep references to masked elements */\n\
-    this.targets = []\n\
-  }\n\
+      /* keep references to masked elements */\n\
+      this.targets = []\n\
+    }\n\
   \n\
-  // Inherit from SVG.Container\n\
-  SVG.Mask.prototype = new SVG.Container\n\
+    // Inherit from\n\
+  , inherit: SVG.Container\n\
   \n\
-  //\n\
-  SVG.extend(SVG.Mask, {\n\
-    // Unmask all masked elements and remove itself\n\
-    remove: function() {\n\
-      /* unmask all targets */\n\
-      for (var i = this.targets.length - 1; i >= 0; i--)\n\
-        if (this.targets[i])\n\
-          this.targets[i].unmask()\n\
-      delete this.targets\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Unmask all masked elements and remove itself\n\
+      remove: function() {\n\
+        /* unmask all targets */\n\
+        for (var i = this.targets.length - 1; i >= 0; i--)\n\
+          if (this.targets[i])\n\
+            this.targets[i].unmask()\n\
+        delete this.targets\n\
   \n\
-      /* remove mask from parent */\n\
-      this.parent.removeElement(this)\n\
-      \n\
-      return this\n\
+        /* remove mask from parent */\n\
+        this.parent.removeElement(this)\n\
+        \n\
+        return this\n\
+      }\n\
+    }\n\
+    \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create masking element\n\
+      mask: function() {\n\
+        return this.defs().put(new SVG.Mask)\n\
+      }\n\
     }\n\
   })\n\
   \n\
-  //\n\
+  \n\
   SVG.extend(SVG.Element, {\n\
     // Distribute mask to svg element\n\
     maskWith: function(element) {\n\
@@ -4079,40 +4147,43 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     }\n\
     \n\
   })\n\
+\n\
+\n\
+  SVG.Clip = SVG.invent({\n\
+    // Initialize node\n\
+    create: function() {\n\
+      this.constructor.call(this, SVG.create('clipPath'))\n\
   \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create masking element\n\
-    mask: function() {\n\
-      return this.defs().put(new SVG.Mask)\n\
+      /* keep references to clipped elements */\n\
+      this.targets = []\n\
+    }\n\
+  \n\
+    // Inherit from\n\
+  , inherit: SVG.Container\n\
+  \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Unclip all clipped elements and remove itself\n\
+      remove: function() {\n\
+        /* unclip all targets */\n\
+        for (var i = this.targets.length - 1; i >= 0; i--)\n\
+          if (this.targets[i])\n\
+            this.targets[i].unclip()\n\
+        delete this.targets\n\
+  \n\
+        /* remove clipPath from parent */\n\
+        this.parent.removeElement(this)\n\
+        \n\
+        return this\n\
+      }\n\
     }\n\
     \n\
-  })\n\
-\n\
-  SVG.Clip = function() {\n\
-    this.constructor.call(this, SVG.create('clipPath'))\n\
-  \n\
-    /* keep references to clipped elements */\n\
-    this.targets = []\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Container\n\
-  SVG.Clip.prototype = new SVG.Container\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Clip, {\n\
-    // Unclip all clipped elements and remove itself\n\
-    remove: function() {\n\
-      /* unclip all targets */\n\
-      for (var i = this.targets.length - 1; i >= 0; i--)\n\
-        if (this.targets[i])\n\
-          this.targets[i].unclip()\n\
-      delete this.targets\n\
-  \n\
-      /* remove clipPath from parent */\n\
-      this.parent.removeElement(this)\n\
-      \n\
-      return this\n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create clipping element\n\
+      clip: function() {\n\
+        return this.defs().put(new SVG.Clip)\n\
+      }\n\
     }\n\
   })\n\
   \n\
@@ -4136,435 +4207,495 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     }\n\
     \n\
   })\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create clipping element\n\
-    clip: function() {\n\
-      return this.defs().put(new SVG.Clip)\n\
-    }\n\
-  \n\
-  })\n\
 \n\
-  SVG.Gradient = function(type) {\n\
-    this.constructor.call(this, SVG.create(type + 'Gradient'))\n\
-    \n\
-    /* store type */\n\
-    this.type = type\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Container\n\
-  SVG.Gradient.prototype = new SVG.Container\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Gradient, {\n\
-    // From position\n\
-    from: function(x, y) {\n\
-      return this.type == 'radial' ?\n\
-        this.attr({ fx: new SVG.Number(x), fy: new SVG.Number(y) }) :\n\
-        this.attr({ x1: new SVG.Number(x), y1: new SVG.Number(y) })\n\
-    }\n\
-    // To position\n\
-  , to: function(x, y) {\n\
-      return this.type == 'radial' ?\n\
-        this.attr({ cx: new SVG.Number(x), cy: new SVG.Number(y) }) :\n\
-        this.attr({ x2: new SVG.Number(x), y2: new SVG.Number(y) })\n\
-    }\n\
-    // Radius for radial gradient\n\
-  , radius: function(r) {\n\
-      return this.type == 'radial' ?\n\
-        this.attr({ r: new SVG.Number(r) }) :\n\
-        this\n\
-    }\n\
-    // Add a color stop\n\
-  , at: function(stop) {\n\
-      return this.put(new SVG.Stop(stop))\n\
-    }\n\
-    // Update gradient\n\
-  , update: function(block) {\n\
-      /* remove all stops */\n\
-      this.clear()\n\
+  SVG.Gradient = SVG.invent({\n\
+    // Initialize node\n\
+    create: function(type) {\n\
+      this.constructor.call(this, SVG.create(type + 'Gradient'))\n\
       \n\
-      /* invoke passed block */\n\
-      block(this)\n\
-      \n\
-      return this\n\
+      /* store type */\n\
+      this.type = type\n\
     }\n\
-    // Return the fill id\n\
-  , fill: function() {\n\
-      return 'url(#' + this.attr('id') + ')'\n\
-    }\n\
-    // Alias string convertion to fill\n\
-  , toString: function() {\n\
-      return this.fill()\n\
+  \n\
+    // Inherit from\n\
+  , inherit: SVG.Container\n\
+  \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // From position\n\
+      from: function(x, y) {\n\
+        return this.type == 'radial' ?\n\
+          this.attr({ fx: new SVG.Number(x), fy: new SVG.Number(y) }) :\n\
+          this.attr({ x1: new SVG.Number(x), y1: new SVG.Number(y) })\n\
+      }\n\
+      // To position\n\
+    , to: function(x, y) {\n\
+        return this.type == 'radial' ?\n\
+          this.attr({ cx: new SVG.Number(x), cy: new SVG.Number(y) }) :\n\
+          this.attr({ x2: new SVG.Number(x), y2: new SVG.Number(y) })\n\
+      }\n\
+      // Radius for radial gradient\n\
+    , radius: function(r) {\n\
+        return this.type == 'radial' ?\n\
+          this.attr({ r: new SVG.Number(r) }) :\n\
+          this\n\
+      }\n\
+      // Add a color stop\n\
+    , at: function(stop) {\n\
+        return this.put(new SVG.Stop).update(stop)\n\
+      }\n\
+      // Update gradient\n\
+    , update: function(block) {\n\
+        /* remove all stops */\n\
+        this.clear()\n\
+        \n\
+        /* invoke passed block */\n\
+        if (typeof block == 'function')\n\
+          block.call(this, this)\n\
+        \n\
+        return this\n\
+      }\n\
+      // Return the fill id\n\
+    , fill: function() {\n\
+        return 'url(#' + this.attr('id') + ')'\n\
+      }\n\
+      // Alias string convertion to fill\n\
+    , toString: function() {\n\
+        return this.fill()\n\
+      }\n\
     }\n\
     \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create gradient element in defs\n\
+      gradient: function(type, block) {\n\
+        return this.defs().gradient(type, block)\n\
+      }\n\
+    }\n\
   })\n\
   \n\
-  //\n\
   SVG.extend(SVG.Defs, {\n\
     // define gradient\n\
     gradient: function(type, block) {\n\
-      var element = this.put(new SVG.Gradient(type))\n\
-      \n\
-      /* invoke passed block */\n\
-      block(element)\n\
-      \n\
-      return element\n\
+      return this.put(new SVG.Gradient(type)).update(block)\n\
     }\n\
     \n\
   })\n\
   \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create gradient element in defs\n\
-    gradient: function(type, block) {\n\
-      return this.defs().gradient(type, block)\n\
-    }\n\
-    \n\
-  })\n\
+  SVG.Stop = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'stop'\n\
   \n\
+    // Inherit from\n\
+  , inherit: SVG.Element\n\
   \n\
-  SVG.Stop = function(stop) {\n\
-    this.constructor.call(this, SVG.create('stop'))\n\
-    \n\
-    /* immediatelly build stop */\n\
-    this.update(stop)\n\
-  }\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // add color stops\n\
+      update: function(o) {\n\
+        /* set attributes */\n\
+        if (o.opacity != null) this.attr('stop-opacity', o.opacity)\n\
+        if (o.color   != null) this.attr('stop-color', o.color)\n\
+        if (o.offset  != null) this.attr('offset', new SVG.Number(o.offset))\n\
   \n\
-  // Inherit from SVG.Element\n\
-  SVG.Stop.prototype = new SVG.Element\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Stop, {\n\
-    // add color stops\n\
-    update: function(o) {\n\
-      /* set attributes */\n\
-      if (o.opacity != null) this.attr('stop-opacity', o.opacity)\n\
-      if (o.color   != null) this.attr('stop-color', o.color)\n\
-      if (o.offset  != null) this.attr('offset', new SVG.Number(o.offset))\n\
-  \n\
-      return this\n\
-    }\n\
-    \n\
-  })\n\
-  \n\
-\n\
-\n\
-  SVG.Doc = function(element) {\n\
-    /* ensure the presence of a html element */\n\
-    this.parent = typeof element == 'string' ?\n\
-      document.getElementById(element) :\n\
-      element\n\
-    \n\
-    /* If the target is an svg element, use that element as the main wrapper.\n\
-       This allows svg.js to work with svg documents as well. */\n\
-    this.constructor\n\
-      .call(this, this.parent.nodeName == 'svg' ? this.parent : SVG.create('svg'))\n\
-    \n\
-    /* set svg element attributes */\n\
-    this\n\
-      .attr({ xmlns: SVG.ns, version: '1.1', width: '100%', height: '100%' })\n\
-      .attr('xmlns:xlink', SVG.xlink, SVG.xmlns)\n\
-    \n\
-    /* create the <defs> node */\n\
-    this._defs = new SVG.Defs\n\
-    this._defs.parent = this\n\
-    this.node.appendChild(this._defs.node)\n\
-  \n\
-    /* turno of sub pixel offset by default */\n\
-    this.doSubPixelOffsetFix = false\n\
-    \n\
-    /* ensure correct rendering */\n\
-    if (this.parent.nodeName != 'svg')\n\
-      this.stage()\n\
-  }\n\
-  \n\
-  // Inherits from SVG.Container\n\
-  SVG.Doc.prototype = new SVG.Container\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Doc, {\n\
-    // Hack for safari preventing text to be rendered in one line.\n\
-    // Basically it sets the position of the svg node to absolute\n\
-    // when the dom is loaded, and resets it to relative a few milliseconds later.\n\
-    // It also handles sub-pixel offset rendering properly.\n\
-    stage: function() {\n\
-      var check\n\
-        , element = this\n\
-        , wrapper = document.createElement('div')\n\
-  \n\
-      /* set temporary wrapper to position relative */\n\
-      wrapper.style.cssText = 'position:relative;height:100%;'\n\
-  \n\
-      /* put element into wrapper */\n\
-      element.parent.appendChild(wrapper)\n\
-      wrapper.appendChild(element.node)\n\
-  \n\
-      /* check for dom:ready */\n\
-      check = function() {\n\
-        if (document.readyState === 'complete') {\n\
-          element.style('position:absolute;')\n\
-          setTimeout(function() {\n\
-            /* set position back to relative */\n\
-            element.style('position:relative;overflow:hidden;')\n\
-  \n\
-            /* remove temporary wrapper */\n\
-            element.parent.removeChild(element.node.parentNode)\n\
-            element.node.parentNode.removeChild(element.node)\n\
-            element.parent.appendChild(element.node)\n\
-  \n\
-            /* after wrapping is done, fix sub-pixel offset */\n\
-            element.subPixelOffsetFix()\n\
-            \n\
-            /* make sure sub-pixel offset is fixed every time the window is resized */\n\
-            SVG.on(window, 'resize', function() {\n\
-              element.subPixelOffsetFix()\n\
-            })\n\
-            \n\
-          }, 5)\n\
-        } else {\n\
-          setTimeout(check, 10)\n\
-        }\n\
+        return this\n\
       }\n\
-  \n\
-      check()\n\
-  \n\
-      return this\n\
     }\n\
   \n\
-    // Creates and returns defs element\n\
-  , defs: function() {\n\
-      return this._defs\n\
-    }\n\
+  })\n\
+\n\
+\n\
+  SVG.Pattern = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'pattern'\n\
   \n\
-    // Fix for possible sub-pixel offset. See:\n\
-    // https://bugzilla.mozilla.org/show_bug.cgi?id=608812\n\
-  , subPixelOffsetFix: function() {\n\
-      if (this.doSubPixelOffsetFix) {\n\
-        var pos = this.node.getScreenCTM()\n\
+    // Inherit from\n\
+  , inherit: SVG.Container\n\
+  \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Return the fill id\n\
+  \t  fill: function() {\n\
+  \t    return 'url(#' + this.attr('id') + ')'\n\
+  \t  }\n\
+  \t  // Update pattern by rebuilding\n\
+  \t, update: function(block) {\n\
+  \t\t\t/* remove content */\n\
+        this.clear()\n\
         \n\
-        if (pos)\n\
-          this\n\
-            .style('left', (-pos.e % 1) + 'px')\n\
-            .style('top',  (-pos.f % 1) + 'px')\n\
+        /* invoke passed block */\n\
+        if (typeof block == 'function')\n\
+        \tblock.call(this, this)\n\
+        \n\
+        return this\n\
+  \t\t}\n\
+  \t  // Alias string convertion to fill\n\
+  \t, toString: function() {\n\
+  \t    return this.fill()\n\
+  \t  }\n\
+    }\n\
+    \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create pattern element in defs\n\
+  \t  pattern: function(width, height, block) {\n\
+  \t    return this.defs().pattern(width, height, block)\n\
+  \t  }\n\
+    }\n\
+  })\n\
+  \n\
+  SVG.extend(SVG.Defs, {\n\
+    // Define gradient\n\
+    pattern: function(width, height, block) {\n\
+      return this.put(new SVG.Pattern).update(block).attr({\n\
+        x:            0\n\
+      , y:            0\n\
+      , width:        width\n\
+      , height:       height\n\
+      , patternUnits: 'userSpaceOnUse'\n\
+      })\n\
+    }\n\
+  \n\
+  })\n\
+\n\
+  SVG.Doc = SVG.invent({\n\
+    // Initialize node\n\
+    create: function(element) {\n\
+      /* ensure the presence of a html element */\n\
+      this.parent = typeof element == 'string' ?\n\
+        document.getElementById(element) :\n\
+        element\n\
+      \n\
+      /* If the target is an svg element, use that element as the main wrapper.\n\
+         This allows svg.js to work with svg documents as well. */\n\
+      this.constructor\n\
+        .call(this, this.parent.nodeName == 'svg' ? this.parent : SVG.create('svg'))\n\
+      \n\
+      /* set svg element attributes */\n\
+      this\n\
+        .attr({ xmlns: SVG.ns, version: '1.1', width: '100%', height: '100%' })\n\
+        .attr('xmlns:xlink', SVG.xlink, SVG.xmlns)\n\
+      \n\
+      /* create the <defs> node */\n\
+      this._defs = new SVG.Defs\n\
+      this._defs.parent = this\n\
+      this.node.appendChild(this._defs.node)\n\
+  \n\
+      /* turno of sub pixel offset by default */\n\
+      this.doSubPixelOffsetFix = false\n\
+      \n\
+      /* ensure correct rendering */\n\
+      if (this.parent.nodeName != 'svg')\n\
+        this.stage()\n\
+    }\n\
+  \n\
+    // Inherit from\n\
+  , inherit: SVG.Container\n\
+  \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Hack for safari preventing text to be rendered in one line.\n\
+      // Basically it sets the position of the svg node to absolute\n\
+      // when the dom is loaded, and resets it to relative a few milliseconds later.\n\
+      // It also handles sub-pixel offset rendering properly.\n\
+      stage: function() {\n\
+        var check\n\
+          , element = this\n\
+          , wrapper = document.createElement('div')\n\
+  \n\
+        /* set temporary wrapper to position relative */\n\
+        wrapper.style.cssText = 'position:relative;height:100%;'\n\
+  \n\
+        /* put element into wrapper */\n\
+        element.parent.appendChild(wrapper)\n\
+        wrapper.appendChild(element.node)\n\
+  \n\
+        /* check for dom:ready */\n\
+        check = function() {\n\
+          if (document.readyState === 'complete') {\n\
+            element.style('position:absolute;')\n\
+            setTimeout(function() {\n\
+              /* set position back to relative */\n\
+              element.style('position:relative;overflow:hidden;')\n\
+  \n\
+              /* remove temporary wrapper */\n\
+              element.parent.removeChild(element.node.parentNode)\n\
+              element.node.parentNode.removeChild(element.node)\n\
+              element.parent.appendChild(element.node)\n\
+  \n\
+              /* after wrapping is done, fix sub-pixel offset */\n\
+              element.subPixelOffsetFix()\n\
+              \n\
+              /* make sure sub-pixel offset is fixed every time the window is resized */\n\
+              SVG.on(window, 'resize', function() {\n\
+                element.subPixelOffsetFix()\n\
+              })\n\
+              \n\
+            }, 5)\n\
+          } else {\n\
+            setTimeout(check, 10)\n\
+          }\n\
+        }\n\
+  \n\
+        check()\n\
+  \n\
+        return this\n\
+      }\n\
+  \n\
+      // Creates and returns defs element\n\
+    , defs: function() {\n\
+        return this._defs\n\
+      }\n\
+  \n\
+      // Fix for possible sub-pixel offset. See:\n\
+      // https://bugzilla.mozilla.org/show_bug.cgi?id=608812\n\
+    , subPixelOffsetFix: function() {\n\
+        if (this.doSubPixelOffsetFix) {\n\
+          var pos = this.node.getScreenCTM()\n\
+          \n\
+          if (pos)\n\
+            this\n\
+              .style('left', (-pos.e % 1) + 'px')\n\
+              .style('top',  (-pos.f % 1) + 'px')\n\
+        }\n\
+        \n\
+        return this\n\
+      }\n\
+  \n\
+    , fixSubPixelOffset: function() {\n\
+        this.doSubPixelOffsetFix = true\n\
+  \n\
+        return this\n\
+      }\n\
+    }\n\
+    \n\
+  })\n\
+\n\
+\n\
+  SVG.Shape = SVG.invent({\n\
+    // Initialize node\n\
+    create: function(element) {\n\
+  \t  this.constructor.call(this, element)\n\
+  \t}\n\
+  \n\
+    // Inherit from\n\
+  , inherit: SVG.Element\n\
+  \n\
+  })\n\
+\n\
+  SVG.Use = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'use'\n\
+  \n\
+    // Inherit from\n\
+  , inherit: SVG.Shape\n\
+  \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Use element as a reference\n\
+      element: function(element) {\n\
+        /* store target element */\n\
+        this.target = element\n\
+  \n\
+        /* set lined element */\n\
+        return this.attr('href', '#' + element, SVG.xlink)\n\
+      }\n\
+    }\n\
+    \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create a use element\n\
+      use: function(element) {\n\
+        return this.put(new SVG.Use).element(element)\n\
+      }\n\
+    }\n\
+  })\n\
+\n\
+  SVG.Rect = SVG.invent({\n\
+  \t// Initialize node\n\
+    create: 'rect'\n\
+  \n\
+  \t// Inherit from\n\
+  , inherit: SVG.Shape\n\
+  \t\n\
+  \t// Add parent method\n\
+  , construct: {\n\
+    \t// Create a rect element\n\
+    \trect: function(width, height) {\n\
+    \t  return this.put(new SVG.Rect().size(width, height))\n\
+    \t}\n\
+    \t\n\
+  \t}\n\
+  \t\n\
+  })\n\
+\n\
+  SVG.Ellipse = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'ellipse'\n\
+  \n\
+    // Inherit from\n\
+  , inherit: SVG.Shape\n\
+  \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Move over x-axis\n\
+      x: function(x) {\n\
+        return x == null ? this.cx() - this.attr('rx') : this.cx(x + this.attr('rx'))\n\
+      }\n\
+      // Move over y-axis\n\
+    , y: function(y) {\n\
+        return y == null ? this.cy() - this.attr('ry') : this.cy(y + this.attr('ry'))\n\
+      }\n\
+      // Move by center over x-axis\n\
+    , cx: function(x) {\n\
+        return x == null ? this.attr('cx') : this.attr('cx', new SVG.Number(x).divide(this.trans.scaleX))\n\
+      }\n\
+      // Move by center over y-axis\n\
+    , cy: function(y) {\n\
+        return y == null ? this.attr('cy') : this.attr('cy', new SVG.Number(y).divide(this.trans.scaleY))\n\
+      }\n\
+      // Set width of element\n\
+    , width: function(width) {\n\
+        return width == null ? this.attr('rx') * 2 : this.attr('rx', new SVG.Number(width).divide(2))\n\
+      }\n\
+      // Set height of element\n\
+    , height: function(height) {\n\
+        return height == null ? this.attr('ry') * 2 : this.attr('ry', new SVG.Number(height).divide(2))\n\
+      }\n\
+      // Custom size function\n\
+    , size: function(width, height) {\n\
+        var p = this._proportionalSize(width, height)\n\
+  \n\
+        return this.attr({\n\
+          rx: new SVG.Number(p.width).divide(2)\n\
+        , ry: new SVG.Number(p.height).divide(2)\n\
+        })\n\
       }\n\
       \n\
-      return this\n\
     }\n\
   \n\
-  , fixSubPixelOffset: function() {\n\
-      this.doSubPixelOffsetFix = true\n\
-  \n\
-      return this\n\
-    }\n\
-    \n\
-  })\n\
-\n\
-  SVG.Shape = function(element) {\n\
-    this.constructor.call(this, element)\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Element\n\
-  SVG.Shape.prototype = new SVG.Element\n\
-\n\
-  SVG.Use = function() {\n\
-    this.constructor.call(this, SVG.create('use'))\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Shape\n\
-  SVG.Use.prototype = new SVG.Shape\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Use, {\n\
-    // Use element as a reference\n\
-    element: function(element) {\n\
-      /* store target element */\n\
-      this.target = element\n\
-  \n\
-      /* set lined element */\n\
-      return this.attr('href', '#' + element, SVG.xlink)\n\
-    }\n\
-    \n\
-  })\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create a use element\n\
-    use: function(element) {\n\
-      return this.put(new SVG.Use).element(element)\n\
-    }\n\
-  \n\
-  })\n\
-\n\
-  SVG.Rect = function() {\n\
-    this.constructor.call(this, SVG.create('rect'))\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Shape\n\
-  SVG.Rect.prototype = new SVG.Shape\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create a rect element\n\
-    rect: function(width, height) {\n\
-      return this.put(new SVG.Rect().size(width, height))\n\
-    }\n\
-  \n\
-  })\n\
-\n\
-  SVG.Ellipse = function() {\n\
-    this.constructor.call(this, SVG.create('ellipse'))\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Shape\n\
-  SVG.Ellipse.prototype = new SVG.Shape\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Ellipse, {\n\
-    // Move over x-axis\n\
-    x: function(x) {\n\
-      return x == null ? this.cx() - this.attr('rx') : this.cx(x + this.attr('rx'))\n\
-    }\n\
-    // Move over y-axis\n\
-  , y: function(y) {\n\
-      return y == null ? this.cy() - this.attr('ry') : this.cy(y + this.attr('ry'))\n\
-    }\n\
-    // Move by center over x-axis\n\
-  , cx: function(x) {\n\
-      return x == null ? this.attr('cx') : this.attr('cx', new SVG.Number(x).divide(this.trans.scaleX))\n\
-    }\n\
-    // Move by center over y-axis\n\
-  , cy: function(y) {\n\
-      return y == null ? this.attr('cy') : this.attr('cy', new SVG.Number(y).divide(this.trans.scaleY))\n\
-    }\n\
-    // Set width of element\n\
-  , width: function(width) {\n\
-      return width == null ? this.attr('rx') * 2 : this.attr('rx', new SVG.Number(width).divide(2))\n\
-    }\n\
-    // Set height of element\n\
-  , height: function(height) {\n\
-      return height == null ? this.attr('ry') * 2 : this.attr('ry', new SVG.Number(height).divide(2))\n\
-    }\n\
-    // Custom size function\n\
-  , size: function(width, height) {\n\
-      var p = this._proportionalSize(width, height)\n\
-  \n\
-      return this.attr({\n\
-        rx: new SVG.Number(p.width).divide(2)\n\
-      , ry: new SVG.Number(p.height).divide(2)\n\
-      })\n\
-    }\n\
-    \n\
-  })\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create circle element, based on ellipse\n\
-    circle: function(size) {\n\
-      return this.ellipse(size, size)\n\
-    }\n\
-    // Create an ellipse\n\
-  , ellipse: function(width, height) {\n\
-      return this.put(new SVG.Ellipse).size(width, height).move(0, 0)\n\
-    }\n\
-    \n\
-  })\n\
-  \n\
-  // Usage:\n\
-  \n\
-  //     draw.ellipse(200, 100)\n\
-\n\
-  SVG.Line = function() {\n\
-    this.constructor.call(this, SVG.create('line'))\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Shape\n\
-  SVG.Line.prototype = new SVG.Shape\n\
-  \n\
-  // Add required methods\n\
-  SVG.extend(SVG.Line, {\n\
-    // Move over x-axis\n\
-    x: function(x) {\n\
-      var b = this.bbox()\n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create circle element, based on ellipse\n\
+      circle: function(size) {\n\
+        return this.ellipse(size, size)\n\
+      }\n\
+      // Create an ellipse\n\
+    , ellipse: function(width, height) {\n\
+        return this.put(new SVG.Ellipse).size(width, height).move(0, 0)\n\
+      }\n\
       \n\
-      return x == null ? b.x : this.attr({\n\
-        x1: this.attr('x1') - b.x + x\n\
-      , x2: this.attr('x2') - b.x + x\n\
-      })\n\
     }\n\
-    // Move over y-axis\n\
-  , y: function(y) {\n\
-      var b = this.bbox()\n\
-      \n\
-      return y == null ? b.y : this.attr({\n\
-        y1: this.attr('y1') - b.y + y\n\
-      , y2: this.attr('y2') - b.y + y\n\
-      })\n\
-    }\n\
-    // Move by center over x-axis\n\
-  , cx: function(x) {\n\
-      var half = this.bbox().width / 2\n\
-      return x == null ? this.x() + half : this.x(x - half)\n\
-    }\n\
-    // Move by center over y-axis\n\
-  , cy: function(y) {\n\
-      var half = this.bbox().height / 2\n\
-      return y == null ? this.y() + half : this.y(y - half)\n\
-    }\n\
-    // Set width of element\n\
-  , width: function(width) {\n\
-      var b = this.bbox()\n\
   \n\
-      return width == null ? b.width : this.attr(this.attr('x1') < this.attr('x2') ? 'x2' : 'x1', b.x + width)\n\
-    }\n\
-    // Set height of element\n\
-  , height: function(height) {\n\
-      var b = this.bbox()\n\
-  \n\
-      return height == null ? b.height : this.attr(this.attr('y1') < this.attr('y2') ? 'y2' : 'y1', b.y + height)\n\
-    }\n\
-    // Set line size by width and height\n\
-  , size: function(width, height) {\n\
-      var p = this._proportionalSize(width, height)\n\
-  \n\
-      return this.width(p.width).height(p.height)\n\
-    }\n\
-    // Set path data\n\
-  , plot: function(x1, y1, x2, y2) {\n\
-      return this.attr({\n\
-        x1: x1\n\
-      , y1: y1\n\
-      , x2: x2\n\
-      , y2: y2\n\
-      })\n\
-    }\n\
-    \n\
   })\n\
+\n\
+  SVG.Line = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'line'\n\
   \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create a line element\n\
-    line: function(x1, y1, x2, y2) {\n\
-      return this.put(new SVG.Line().plot(x1, y1, x2, y2))\n\
+    // Inherit from\n\
+  , inherit: SVG.Shape\n\
+  \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Move over x-axis\n\
+      x: function(x) {\n\
+        var b = this.bbox()\n\
+        \n\
+        return x == null ? b.x : this.attr({\n\
+          x1: this.attr('x1') - b.x + x\n\
+        , x2: this.attr('x2') - b.x + x\n\
+        })\n\
+      }\n\
+      // Move over y-axis\n\
+    , y: function(y) {\n\
+        var b = this.bbox()\n\
+        \n\
+        return y == null ? b.y : this.attr({\n\
+          y1: this.attr('y1') - b.y + y\n\
+        , y2: this.attr('y2') - b.y + y\n\
+        })\n\
+      }\n\
+      // Move by center over x-axis\n\
+    , cx: function(x) {\n\
+        var half = this.bbox().width / 2\n\
+        return x == null ? this.x() + half : this.x(x - half)\n\
+      }\n\
+      // Move by center over y-axis\n\
+    , cy: function(y) {\n\
+        var half = this.bbox().height / 2\n\
+        return y == null ? this.y() + half : this.y(y - half)\n\
+      }\n\
+      // Set width of element\n\
+    , width: function(width) {\n\
+        var b = this.bbox()\n\
+  \n\
+        return width == null ? b.width : this.attr(this.attr('x1') < this.attr('x2') ? 'x2' : 'x1', b.x + width)\n\
+      }\n\
+      // Set height of element\n\
+    , height: function(height) {\n\
+        var b = this.bbox()\n\
+  \n\
+        return height == null ? b.height : this.attr(this.attr('y1') < this.attr('y2') ? 'y2' : 'y1', b.y + height)\n\
+      }\n\
+      // Set line size by width and height\n\
+    , size: function(width, height) {\n\
+        var p = this._proportionalSize(width, height)\n\
+  \n\
+        return this.width(p.width).height(p.height)\n\
+      }\n\
+      // Set path data\n\
+    , plot: function(x1, y1, x2, y2) {\n\
+        return this.attr({\n\
+          x1: x1\n\
+        , y1: y1\n\
+        , x2: x2\n\
+        , y2: y2\n\
+        })\n\
+      }\n\
     }\n\
     \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create a line element\n\
+      line: function(x1, y1, x2, y2) {\n\
+        return this.put(new SVG.Line().plot(x1, y1, x2, y2))\n\
+      }\n\
+    }\n\
   })\n\
 \n\
 \n\
-  SVG.Polyline = function() {\n\
-    this.constructor.call(this, SVG.create('polyline'))\n\
-  }\n\
+  SVG.Polyline = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'polyline'\n\
   \n\
-  // Inherit from SVG.Shape\n\
-  SVG.Polyline.prototype = new SVG.Shape\n\
+    // Inherit from\n\
+  , inherit: SVG.Shape\n\
+    \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create a wrapped polyline element\n\
+      polyline: function(p) {\n\
+        return this.put(new SVG.Polyline).plot(p)\n\
+      }\n\
+    }\n\
+  })\n\
   \n\
-  SVG.Polygon = function() {\n\
-    this.constructor.call(this, SVG.create('polygon'))\n\
-  }\n\
+  SVG.Polygon = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'polygon'\n\
   \n\
-  // Inherit from SVG.Shape\n\
-  SVG.Polygon.prototype = new SVG.Shape\n\
+    // Inherit from\n\
+  , inherit: SVG.Shape\n\
+    \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create a wrapped polygon element\n\
+      polygon: function(p) {\n\
+        return this.put(new SVG.Polygon).plot(p)\n\
+      }\n\
+    }\n\
+  })\n\
   \n\
   // Add polygon-specific functions\n\
   SVG.extend(SVG.Polyline, SVG.Polygon, {\n\
@@ -4606,399 +4737,423 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     }\n\
   \n\
   })\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create a wrapped polyline element\n\
-    polyline: function(p) {\n\
-      return this.put(new SVG.Polyline).plot(p)\n\
-    }\n\
-    // Create a wrapped polygon element\n\
-  , polygon: function(p) {\n\
-      return this.put(new SVG.Polygon).plot(p)\n\
-    }\n\
-  \n\
-  })\n\
 \n\
-  SVG.Path = function() {\n\
-    this.constructor.call(this, SVG.create('path'))\n\
-  }\n\
+  SVG.Path = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'path'\n\
   \n\
-  // Inherit from SVG.Shape\n\
-  SVG.Path.prototype = new SVG.Shape\n\
+    // Inherit from\n\
+  , inherit: SVG.Shape\n\
   \n\
-  SVG.extend(SVG.Path, {\n\
-    // Plot new poly points\n\
-    plot: function(p) {\n\
-      return this.attr('d', (this.array = new SVG.PathArray(p, [{ type:'M',x:0,y:0 }])))\n\
-    }\n\
-    // Move by left top corner\n\
-  , move: function(x, y) {\n\
-      return this.attr('d', this.array.move(x, y))\n\
-    }\n\
-    // Move by left top corner over x-axis\n\
-  , x: function(x) {\n\
-      return x == null ? this.bbox().x : this.move(x, this.bbox().y)\n\
-    }\n\
-    // Move by left top corner over y-axis\n\
-  , y: function(y) {\n\
-      return y == null ? this.bbox().y : this.move(this.bbox().x, y)\n\
-    }\n\
-    // Set element size to given width and height\n\
-  , size: function(width, height) {\n\
-      var p = this._proportionalSize(width, height)\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Plot new poly points\n\
+      plot: function(p) {\n\
+        return this.attr('d', (this.array = new SVG.PathArray(p, [{ type:'M',x:0,y:0 }])))\n\
+      }\n\
+      // Move by left top corner\n\
+    , move: function(x, y) {\n\
+        return this.attr('d', this.array.move(x, y))\n\
+      }\n\
+      // Move by left top corner over x-axis\n\
+    , x: function(x) {\n\
+        return x == null ? this.bbox().x : this.move(x, this.bbox().y)\n\
+      }\n\
+      // Move by left top corner over y-axis\n\
+    , y: function(y) {\n\
+        return y == null ? this.bbox().y : this.move(this.bbox().x, y)\n\
+      }\n\
+      // Set element size to given width and height\n\
+    , size: function(width, height) {\n\
+        var p = this._proportionalSize(width, height)\n\
+        \n\
+        return this.attr('d', this.array.size(p.width, p.height))\n\
+      }\n\
+      // Set width of element\n\
+    , width: function(width) {\n\
+        return width == null ? this.bbox().width : this.size(width, this.bbox().height)\n\
+      }\n\
+      // Set height of element\n\
+    , height: function(height) {\n\
+        return height == null ? this.bbox().height : this.size(this.bbox().width, height)\n\
+      }\n\
       \n\
-      return this.attr('d', this.array.size(p.width, p.height))\n\
     }\n\
-    // Set width of element\n\
-  , width: function(width) {\n\
-      return width == null ? this.bbox().width : this.size(width, this.bbox().height)\n\
+    \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create a wrapped path element\n\
+      path: function(d) {\n\
+        return this.put(new SVG.Path).plot(d)\n\
+      }\n\
     }\n\
-    // Set height of element\n\
-  , height: function(height) {\n\
-      return height == null ? this.bbox().height : this.size(this.bbox().width, height)\n\
-    }\n\
-  \n\
-  })\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create a wrapped path element\n\
-    path: function(d) {\n\
-      return this.put(new SVG.Path).plot(d)\n\
-    }\n\
-  \n\
   })\n\
 \n\
-  SVG.Image = function() {\n\
-    this.constructor.call(this, SVG.create('image'))\n\
-  }\n\
+  SVG.Image = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'image'\n\
   \n\
-  // Inherit from SVG.Element\n\
-  SVG.Image.prototype = new SVG.Shape\n\
+    // Inherit from\n\
+  , inherit: SVG.Shape\n\
   \n\
-  //\n\
-  SVG.extend(SVG.Image, {\n\
-    // (re)load image\n\
-    load: function(url) {\n\
-      return (url ? this.attr('href', (this.src = url), SVG.xlink) : this)\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // (re)load image\n\
+      load: function(url) {\n\
+        if (!url) return this\n\
+  \n\
+        var self = this\n\
+          , img  = document.createElement('img')\n\
+        \n\
+        /* preload image */\n\
+        img.onload = function() {\n\
+          var p = self.doc(SVG.Pattern)\n\
+  \n\
+          /* ensure image size */\n\
+          if (self.width() == 0 && self.height() == 0)\n\
+            self.size(img.width, img.height)\n\
+  \n\
+          /* ensure pattern size if not set */\n\
+          if (p && p.width() == 0 && p.height() == 0)\n\
+            p.size(self.width(), self.height())\n\
+          \n\
+          /* callback */\n\
+          if (typeof self._loaded == 'function')\n\
+            self._loaded.call(self, {\n\
+              width:  img.width\n\
+            , height: img.height\n\
+            , ratio:  img.width / img.height\n\
+            , url:    url\n\
+            })\n\
+        }\n\
+  \n\
+        return this.attr('href', (img.src = this.src = url), SVG.xlink)\n\
+      }\n\
+      // Add loade callback\n\
+    , loaded: function(loaded) {\n\
+        this._loaded = loaded\n\
+        return this\n\
+      }\n\
     }\n\
-  })\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create image element, load image and set its size\n\
-    image: function(source, width, height) {\n\
-      width = width != null ? width : 100\n\
-      return this.put(new SVG.Image().load(source).size(width, height != null ? height : width))\n\
+    \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create image element, load image and set its size\n\
+      image: function(source, width, height) {\n\
+        return this.put(new SVG.Image).load(source).size(width || 0, height || width || 0)\n\
+      }\n\
     }\n\
-  \n\
   })\n\
 \n\
   var _styleAttr = ('size family weight stretch variant style').split(' ')\n\
   \n\
-  SVG.Text = function() {\n\
-    this.constructor.call(this, SVG.create('text'))\n\
-    \n\
-    /* define default style */\n\
-    this.styles = {\n\
-      'font-size':    16\n\
-    , 'font-family':  'Helvetica, Arial, sans-serif'\n\
-    , 'text-anchor':  'start'\n\
-    }\n\
-    \n\
-    this._leading = new SVG.Number('1.2em')\n\
-    this._rebuild = true\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Element\n\
-  SVG.Text.prototype = new SVG.Shape\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Text, {\n\
-    // Move over x-axis\n\
-    x: function(x, a) {\n\
-      /* act as getter */\n\
-      if (x == null)\n\
-        return a ? this.attr('x') : this.bbox().x\n\
+  SVG.Text = SVG.invent({\n\
+    // Initialize node\n\
+    create: function() {\n\
+      this.constructor.call(this, SVG.create('text'))\n\
       \n\
-      /* set x taking anchor in mind */\n\
-      if (!a) {\n\
-        a = this.style('text-anchor')\n\
-        x = a == 'start' ? x : a == 'end' ? x + this.bbox().width : x + this.bbox().width / 2\n\
+      /* define default style */\n\
+      this.styles = {\n\
+        'font-size':    16\n\
+      , 'font-family':  'Helvetica, Arial, sans-serif'\n\
+      , 'text-anchor':  'start'\n\
       }\n\
-  \n\
-      /* move lines as well if no textPath si present */\n\
-      if (!this.textPath)\n\
-        this.lines.each(function() { if (this.newLined) this.x(x) })\n\
-  \n\
-      return this.attr('x', x)\n\
-    }\n\
-    // Move center over x-axis\n\
-  , cx: function(x, a) {\n\
-      return x == null ? this.bbox().cx : this.x(x - this.bbox().width / 2)\n\
-    }\n\
-    // Move center over y-axis\n\
-  , cy: function(y, a) {\n\
-      return y == null ? this.bbox().cy : this.y(a ? y : y - this.bbox().height / 2)\n\
-    }\n\
-    // Move element to given x and y values\n\
-  , move: function(x, y, a) {\n\
-      return this.x(x, a).y(y)\n\
-    }\n\
-    // Move element by its center\n\
-  , center: function(x, y, a) {\n\
-      return this.cx(x, a).cy(y, a)\n\
-    }\n\
-    // Set the text content\n\
-  , text: function(text) {\n\
-      /* act as getter */\n\
-      if (text == null)\n\
-        return this.content\n\
       \n\
-      /* remove existing lines */\n\
-      this.clear()\n\
-      \n\
-      if (typeof text === 'function') {\n\
-        this._rebuild = false\n\
+      this._leading = new SVG.Number('1.2em')\n\
+      this._rebuild = true\n\
+    }\n\
   \n\
-        text.call(this, this)\n\
+    // Inherit from\n\
+  , inherit: SVG.Shape\n\
   \n\
-      } else {\n\
-        this._rebuild = true\n\
-  \n\
-        /* make sure text is not blank */\n\
-        text = SVG.regex.isBlank.test(text) ? 'text' : text\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Move over x-axis\n\
+      x: function(x, a) {\n\
+        /* act as getter */\n\
+        if (x == null)\n\
+          return a ? this.attr('x') : this.bbox().x\n\
         \n\
-        var i, il\n\
-          , lines = text.split('\\n\
+        /* set x taking anchor in mind */\n\
+        if (!a) {\n\
+          a = this.style('text-anchor')\n\
+          x = a == 'start' ? x : a == 'end' ? x + this.bbox().width : x + this.bbox().width / 2\n\
+        }\n\
+  \n\
+        /* move lines as well if no textPath si present */\n\
+        if (!this.textPath)\n\
+          this.lines.each(function() { if (this.newLined) this.x(x) })\n\
+  \n\
+        return this.attr('x', x)\n\
+      }\n\
+      // Move center over x-axis\n\
+    , cx: function(x, a) {\n\
+        return x == null ? this.bbox().cx : this.x(x - this.bbox().width / 2)\n\
+      }\n\
+      // Move center over y-axis\n\
+    , cy: function(y, a) {\n\
+        return y == null ? this.bbox().cy : this.y(a ? y : y - this.bbox().height / 2)\n\
+      }\n\
+      // Move element to given x and y values\n\
+    , move: function(x, y, a) {\n\
+        return this.x(x, a).y(y)\n\
+      }\n\
+      // Move element by its center\n\
+    , center: function(x, y, a) {\n\
+        return this.cx(x, a).cy(y, a)\n\
+      }\n\
+      // Set the text content\n\
+    , text: function(text) {\n\
+        /* act as getter */\n\
+        if (text == null)\n\
+          return this.content\n\
+        \n\
+        /* remove existing lines */\n\
+        this.clear()\n\
+        \n\
+        if (typeof text === 'function') {\n\
+          this._rebuild = false\n\
+  \n\
+          text.call(this, this)\n\
+  \n\
+        } else {\n\
+          this._rebuild = true\n\
+  \n\
+          /* make sure text is not blank */\n\
+          text = SVG.regex.isBlank.test(text) ? 'text' : text\n\
+          \n\
+          var i, il\n\
+            , lines = text.split('\\n\
 ')\n\
+          \n\
+          /* build new lines */\n\
+          for (i = 0, il = lines.length; i < il; i++)\n\
+            this.tspan(lines[i]).newLine()\n\
+  \n\
+          this.rebuild()\n\
+        }\n\
         \n\
-        /* build new lines */\n\
-        for (i = 0, il = lines.length; i < il; i++)\n\
-          this.tspan(lines[i]).newLine()\n\
-  \n\
-        this.rebuild()\n\
+        return this\n\
       }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Create a tspan\n\
-  , tspan: function(text) {\n\
-      var node  = this.textPath ? this.textPath.node : this.node\n\
-        , tspan = new SVG.TSpan().text(text)\n\
-        , style = this.style()\n\
-      \n\
-      /* add new tspan */\n\
-      node.appendChild(tspan.node)\n\
-      this.lines.add(tspan)\n\
+      // Create a tspan\n\
+    , tspan: function(text) {\n\
+        var node  = this.textPath ? this.textPath.node : this.node\n\
+          , tspan = new SVG.TSpan().text(text)\n\
+          , style = this.style()\n\
+        \n\
+        /* add new tspan */\n\
+        node.appendChild(tspan.node)\n\
+        this.lines.add(tspan)\n\
   \n\
-      /* add style if any */\n\
-      if (!SVG.regex.isBlank.test(style))\n\
-        tspan.style(style)\n\
+        /* add style if any */\n\
+        if (!SVG.regex.isBlank.test(style))\n\
+          tspan.style(style)\n\
   \n\
-      /* store content */\n\
-      this.content += text\n\
+        /* store content */\n\
+        this.content += text\n\
   \n\
-      /* store text parent */\n\
-      tspan.parent = this\n\
+        /* store text parent */\n\
+        tspan.parent = this\n\
   \n\
-      return tspan\n\
-    }\n\
-    // Set font size\n\
-  , size: function(size) {\n\
-      return this.attr('font-size', size)\n\
-    }\n\
-    // Set / get leading\n\
-  , leading: function(value) {\n\
-      /* act as getter */\n\
-      if (value == null)\n\
-        return this._leading\n\
-      \n\
-      /* act as setter */\n\
-      value = new SVG.Number(value)\n\
-      this._leading = value\n\
-      \n\
-      /* apply leading */\n\
-      this.lines.each(function() {\n\
-        if (this.newLined)\n\
-          this.attr('dy', value)\n\
-      })\n\
-  \n\
-      return this\n\
-    }\n\
-    // rebuild appearance type\n\
-  , rebuild: function() {\n\
-      var self = this\n\
-  \n\
-      /* define position of all lines */\n\
-      if (this._rebuild) {\n\
-        this.lines.attr({\n\
-          x:      this.attr('x')\n\
-        , dy:     this._leading\n\
-        , style:  this.style()\n\
+        return tspan\n\
+      }\n\
+      // Set font size\n\
+    , size: function(size) {\n\
+        return this.attr('font-size', size)\n\
+      }\n\
+      // Set / get leading\n\
+    , leading: function(value) {\n\
+        /* act as getter */\n\
+        if (value == null)\n\
+          return this._leading\n\
+        \n\
+        /* act as setter */\n\
+        value = new SVG.Number(value)\n\
+        this._leading = value\n\
+        \n\
+        /* apply leading */\n\
+        this.lines.each(function() {\n\
+          if (this.newLined)\n\
+            this.attr('dy', value)\n\
         })\n\
+  \n\
+        return this\n\
       }\n\
+      // rebuild appearance type\n\
+    , rebuild: function() {\n\
+        var self = this\n\
   \n\
-      return this\n\
-    }\n\
-    // Clear all lines\n\
-  , clear: function() {\n\
-      var node = this.textPath ? this.textPath.node : this.node\n\
+        /* define position of all lines */\n\
+        if (this._rebuild) {\n\
+          this.lines.attr({\n\
+            x:      this.attr('x')\n\
+          , dy:     this._leading\n\
+          , style:  this.style()\n\
+          })\n\
+        }\n\
   \n\
-      /* remove existing child nodes */\n\
-      while (node.hasChildNodes())\n\
-        node.removeChild(node.lastChild)\n\
-      \n\
-      /* refresh lines */\n\
-      delete this.lines\n\
-      this.lines = new SVG.Set\n\
-      \n\
-      /* initialize content */\n\
-      this.content = ''\n\
+        return this\n\
+      }\n\
+      // Clear all lines\n\
+    , clear: function() {\n\
+        var node = this.textPath ? this.textPath.node : this.node\n\
   \n\
-      return this\n\
+        /* remove existing child nodes */\n\
+        while (node.hasChildNodes())\n\
+          node.removeChild(node.lastChild)\n\
+        \n\
+        /* refresh lines */\n\
+        delete this.lines\n\
+        this.lines = new SVG.Set\n\
+        \n\
+        /* initialize content */\n\
+        this.content = ''\n\
+  \n\
+        return this\n\
+      }\n\
     }\n\
     \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create text element\n\
+      text: function(text) {\n\
+        return this.put(new SVG.Text).text(text)\n\
+      }\n\
+    }\n\
   })\n\
   \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create text element\n\
-    text: function(text) {\n\
-      return this.put(new SVG.Text).text(text)\n\
-    }\n\
-    \n\
-  })\n\
+  SVG.TSpan = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'tspan'\n\
   \n\
-  // tspan class\n\
-  SVG.TSpan = function() {\n\
-    this.constructor.call(this, SVG.create('tspan'))\n\
-  }\n\
+    // Inherit from\n\
+  , inherit: SVG.Shape\n\
   \n\
-  // Inherit from SVG.Shape\n\
-  SVG.TSpan.prototype = new SVG.Shape\n\
-  \n\
-  // Include the container object\n\
-  SVG.extend(SVG.TSpan, {\n\
-    // Set text content\n\
-    text: function(text) {\n\
-      this.node.appendChild(document.createTextNode(text))\n\
-      \n\
-      return this\n\
-    }\n\
-    // Shortcut dx\n\
-  , dx: function(dx) {\n\
-      return this.attr('dx', dx)\n\
-    }\n\
-    // Shortcut dy\n\
-  , dy: function(dy) {\n\
-      return this.attr('dy', dy)\n\
-    }\n\
-    // Create new line\n\
-  , newLine: function() {\n\
-      this.newLined = true\n\
-      this.parent.content += '\\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Set text content\n\
+      text: function(text) {\n\
+        this.node.appendChild(document.createTextNode(text))\n\
+        \n\
+        return this\n\
+      }\n\
+      // Shortcut dx\n\
+    , dx: function(dx) {\n\
+        return this.attr('dx', dx)\n\
+      }\n\
+      // Shortcut dy\n\
+    , dy: function(dy) {\n\
+        return this.attr('dy', dy)\n\
+      }\n\
+      // Create new line\n\
+    , newLine: function() {\n\
+        this.newLined = true\n\
+        this.parent.content += '\\n\
 '\n\
-      this.dy(this.parent._leading)\n\
-      return this.attr('x', this.parent.x())\n\
+        this.dy(this.parent._leading)\n\
+        return this.attr('x', this.parent.x())\n\
+      }\n\
     }\n\
-  \n\
-  })\n\
-\n\
-\n\
-  SVG.TextPath = function() {\n\
-    this.constructor.call(this, SVG.create('textPath'))\n\
-  }\n\
-  \n\
-  // Inherit from SVG.Element\n\
-  SVG.TextPath.prototype = new SVG.Element\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Text, {\n\
-    // Create path for text to run on\n\
-    path: function(d) {\n\
-      /* create textPath element */\n\
-      this.textPath = new SVG.TextPath\n\
-  \n\
-      /* move lines to textpath */\n\
-      while(this.node.hasChildNodes())\n\
-        this.textPath.node.appendChild(this.node.firstChild)\n\
-  \n\
-      /* add textPath element as child node */\n\
-      this.node.appendChild(this.textPath.node)\n\
-  \n\
-      /* create path in defs */\n\
-      this.track = this.doc().defs().path(d, true)\n\
-  \n\
-      /* create circular reference */\n\
-      this.textPath.parent = this\n\
-  \n\
-      /* link textPath to path and add content */\n\
-      this.textPath.attr('href', '#' + this.track, SVG.xlink)\n\
-  \n\
-      return this\n\
-    }\n\
-    // Plot path if any\n\
-  , plot: function(d) {\n\
-      if (this.track) this.track.plot(d)\n\
-      return this\n\
-    }\n\
-  \n\
-  })\n\
-\n\
-  SVG.Nested = function() {\n\
-    this.constructor.call(this, SVG.create('svg'))\n\
     \n\
-    this.style('overflow', 'visible')\n\
-  }\n\
+  })\n\
   \n\
-  // Inherit from SVG.Container\n\
-  SVG.Nested.prototype = new SVG.Container\n\
+\n\
+\n\
+  SVG.TextPath = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'textPath'\n\
   \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create nested svg document\n\
+    // Inherit from\n\
+  , inherit: SVG.Element\n\
+  \n\
+    // Define parent class\n\
+  , parent: SVG.Text\n\
+  \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create path for text to run on\n\
+      path: function(d) {\n\
+        /* create textPath element */\n\
+        this.textPath = new SVG.TextPath\n\
+  \n\
+        /* move lines to textpath */\n\
+        while(this.node.hasChildNodes())\n\
+          this.textPath.node.appendChild(this.node.firstChild)\n\
+  \n\
+        /* add textPath element as child node */\n\
+        this.node.appendChild(this.textPath.node)\n\
+  \n\
+        /* create path in defs */\n\
+        this.track = this.doc().defs().path(d)\n\
+  \n\
+        /* create circular reference */\n\
+        this.textPath.parent = this\n\
+  \n\
+        /* link textPath to path and add content */\n\
+        this.textPath.attr('href', '#' + this.track, SVG.xlink)\n\
+  \n\
+        return this\n\
+      }\n\
+      // Plot path if any\n\
+    , plot: function(d) {\n\
+        if (this.track) this.track.plot(d)\n\
+        return this\n\
+      }\n\
+    }\n\
+  })\n\
+\n\
+  SVG.Nested = SVG.invent({\n\
+    // Initialize node\n\
+    create: function() {\n\
+      this.constructor.call(this, SVG.create('svg'))\n\
+      \n\
+      this.style('overflow', 'visible')\n\
+    }\n\
+  \n\
+    // Inherit from\n\
+  , inherit: SVG.Container\n\
+    \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create nested svg document\n\
     nested: function() {\n\
-      return this.put(new SVG.Nested)\n\
+        return this.put(new SVG.Nested)\n\
+      }\n\
     }\n\
-    \n\
   })\n\
 \n\
-  SVG.A = function() {\n\
-    this.constructor.call(this, SVG.create('a'))\n\
-  }\n\
+  SVG.A = SVG.invent({\n\
+    // Initialize node\n\
+    create: 'a'\n\
   \n\
-  // Inherit from SVG.Parent\n\
-  SVG.A.prototype = new SVG.Container\n\
+    // Inherit from\n\
+  , inherit: SVG.Container\n\
   \n\
-  //\n\
-  SVG.extend(SVG.A, {\n\
-    // Link url\n\
-    to: function(url) {\n\
-      return this.attr('href', url, SVG.xlink)\n\
-    }\n\
-    // Link show attribute\n\
-  , show: function(target) {\n\
-      return this.attr('show', target, SVG.xlink)\n\
-    }\n\
-    // Link target attribute\n\
-  , target: function(target) {\n\
-      return this.attr('target', target)\n\
-    }\n\
-  \n\
-  })\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create a hyperlink element\n\
-    link: function(url) {\n\
-      return this.put(new SVG.A).to(url)\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Link url\n\
+      to: function(url) {\n\
+        return this.attr('href', url, SVG.xlink)\n\
+      }\n\
+      // Link show attribute\n\
+    , show: function(target) {\n\
+        return this.attr('show', target, SVG.xlink)\n\
+      }\n\
+      // Link target attribute\n\
+    , target: function(target) {\n\
+        return this.attr('target', target)\n\
+      }\n\
     }\n\
     \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create a hyperlink element\n\
+      link: function(url) {\n\
+        return this.put(new SVG.A).to(url)\n\
+      }\n\
+    }\n\
   })\n\
   \n\
-  //\n\
   SVG.extend(SVG.Element, {\n\
     // Create a hyperlink element\n\
     linkTo: function(url) {\n\
@@ -5087,7 +5242,6 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
   })\n\
   \n\
-  //\n\
   SVG.extend(SVG.Rect, SVG.Ellipse, {\n\
     // Add x and y radius\n\
     radius: function(x, y) {\n\
@@ -5096,114 +5250,134 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
   })\n\
   \n\
-  \n\
-  if (SVG.Text) {\n\
-    SVG.extend(SVG.Text, SVG.FX, {\n\
-      // Set font \n\
-      font: function(o) {\n\
-        for (var key in o)\n\
-          key == 'anchor' ?\n\
-            this.attr('text-anchor', o[key]) :\n\
-          _styleAttr.indexOf(key) > -1 ?\n\
-            this.attr('font-'+ key, o[key]) :\n\
-            this.attr(key, o[key])\n\
-        \n\
-        return this\n\
-      }\n\
-      \n\
-    })\n\
-  }\n\
-  \n\
-\n\
-\n\
-  SVG.Set = function() {\n\
-    /* set initial state */\n\
-    this.clear()\n\
-  }\n\
-  \n\
-  // Set FX class\n\
-  SVG.SetFX = function(set) {\n\
-    /* store reference to set */\n\
-    this.set = set\n\
-  }\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Set, {\n\
-    // Add element to set\n\
-    add: function() {\n\
-      var i, il, elements = [].slice.call(arguments)\n\
-  \n\
-      for (i = 0, il = elements.length; i < il; i++)\n\
-        this.members.push(elements[i])\n\
-      \n\
-      return this\n\
+  SVG.extend(SVG.Path, {\n\
+    // Get path length\n\
+    length: function() {\n\
+      return this.node.getTotalLength()\n\
     }\n\
-    // Remove element from set\n\
-  , remove: function(element) {\n\
-      var i = this.index(element)\n\
-      \n\
-      /* remove given child */\n\
-      if (i > -1)\n\
-        this.members.splice(i, 1)\n\
-  \n\
-      return this\n\
-    }\n\
-    // Iterate over all members\n\
-  , each: function(block) {\n\
-      for (var i = 0, il = this.members.length; i < il; i++)\n\
-        block.apply(this.members[i], [i, this.members])\n\
-  \n\
-      return this\n\
-    }\n\
-    // Restore to defaults\n\
-  , clear: function() {\n\
-      /* initialize store */\n\
-      this.members = []\n\
-  \n\
-      return this\n\
-    }\n\
-    // Checks if a given element is present in set\n\
-  , has: function(element) {\n\
-      return this.index(element) >= 0\n\
-    }\n\
-    // retuns index of given element in set\n\
-  , index: function(element) {\n\
-      return this.members.indexOf(element)\n\
-    }\n\
-    // Get member at given index\n\
-  , get: function(i) {\n\
-      return this.members[i]\n\
-    }\n\
-    // Default value\n\
-  , valueOf: function() {\n\
-      return this.members\n\
-    }\n\
-    // Get the bounding box of all members included or empty box if set has no items\n\
-  , bbox: function(){\n\
-      var box = new SVG.BBox()\n\
-  \n\
-      /* return an empty box of there are no members */\n\
-      if (this.members.length == 0)\n\
-        return box\n\
-  \n\
-      /* get the first rbox and update the target bbox */\n\
-      var rbox = this.members[0].rbox()\n\
-      box.x      = rbox.x\n\
-      box.y      = rbox.y\n\
-      box.width  = rbox.width\n\
-      box.height = rbox.height\n\
-  \n\
-      this.each(function() {\n\
-        /* user rbox for correct position and visual representation */\n\
-        box = box.merge(this.rbox())\n\
-      })\n\
-  \n\
-      return box\n\
+    // Get point at length\n\
+  , pointAt: function(length) {\n\
+      return this.node.getPointAtLength(length)\n\
     }\n\
   \n\
   })\n\
   \n\
+  SVG.extend(SVG.Text, SVG.FX, {\n\
+    // Set font \n\
+    font: function(o) {\n\
+      for (var key in o)\n\
+        key == 'anchor' ?\n\
+          this.attr('text-anchor', o[key]) :\n\
+        _styleAttr.indexOf(key) > -1 ?\n\
+          this.attr('font-'+ key, o[key]) :\n\
+          this.attr(key, o[key])\n\
+      \n\
+      return this\n\
+    }\n\
+    \n\
+  })\n\
   \n\
+\n\
+\n\
+  SVG.Set = SVG.invent({\n\
+    // Initialize\n\
+    create: function() {\n\
+      /* set initial state */\n\
+      this.clear()\n\
+    }\n\
+  \n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Add element to set\n\
+      add: function() {\n\
+        var i, il, elements = [].slice.call(arguments)\n\
+  \n\
+        for (i = 0, il = elements.length; i < il; i++)\n\
+          this.members.push(elements[i])\n\
+        \n\
+        return this\n\
+      }\n\
+      // Remove element from set\n\
+    , remove: function(element) {\n\
+        var i = this.index(element)\n\
+        \n\
+        /* remove given child */\n\
+        if (i > -1)\n\
+          this.members.splice(i, 1)\n\
+  \n\
+        return this\n\
+      }\n\
+      // Iterate over all members\n\
+    , each: function(block) {\n\
+        for (var i = 0, il = this.members.length; i < il; i++)\n\
+          block.apply(this.members[i], [i, this.members])\n\
+  \n\
+        return this\n\
+      }\n\
+      // Restore to defaults\n\
+    , clear: function() {\n\
+        /* initialize store */\n\
+        this.members = []\n\
+  \n\
+        return this\n\
+      }\n\
+      // Checks if a given element is present in set\n\
+    , has: function(element) {\n\
+        return this.index(element) >= 0\n\
+      }\n\
+      // retuns index of given element in set\n\
+    , index: function(element) {\n\
+        return this.members.indexOf(element)\n\
+      }\n\
+      // Get member at given index\n\
+    , get: function(i) {\n\
+        return this.members[i]\n\
+      }\n\
+      // Default value\n\
+    , valueOf: function() {\n\
+        return this.members\n\
+      }\n\
+      // Get the bounding box of all members included or empty box if set has no items\n\
+    , bbox: function(){\n\
+        var box = new SVG.BBox()\n\
+  \n\
+        /* return an empty box of there are no members */\n\
+        if (this.members.length == 0)\n\
+          return box\n\
+  \n\
+        /* get the first rbox and update the target bbox */\n\
+        var rbox = this.members[0].rbox()\n\
+        box.x      = rbox.x\n\
+        box.y      = rbox.y\n\
+        box.width  = rbox.width\n\
+        box.height = rbox.height\n\
+  \n\
+        this.each(function() {\n\
+          /* user rbox for correct position and visual representation */\n\
+          box = box.merge(this.rbox())\n\
+        })\n\
+  \n\
+        return box\n\
+      }\n\
+    }\n\
+    \n\
+    // Add parent method\n\
+  , construct: {\n\
+      // Create a new set\n\
+      set: function() {\n\
+        return new SVG.Set\n\
+      }\n\
+    }\n\
+  })\n\
+  \n\
+  SVG.SetFX = SVG.invent({\n\
+    // Initialize node\n\
+    create: function(set) {\n\
+      /* store reference to set */\n\
+      this.set = set\n\
+    }\n\
+  \n\
+  })\n\
   \n\
   // Alias methods\n\
   SVG.Set.inherit = function() {\n\
@@ -5244,16 +5418,6 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
       }\n\
     })\n\
   }\n\
-  \n\
-  //\n\
-  SVG.extend(SVG.Container, {\n\
-    // Create a new set\n\
-    set: function() {\n\
-      return new SVG.Set\n\
-    }\n\
-  \n\
-  })\n\
-  \n\
   \n\
   \n\
 \n\
@@ -9350,4266 +9514,6 @@ function api(fn, method, adapter) {\n\
 }//@ sourceURL=tower-adapter/index.js"
 ));
 
-require.register("tower-expression/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var slice = [].slice;\n\
-var toString = Object.prototype.toString;\n\
-var isFunction = function(val) {\n\
-  return '[object Function]' === toString.call(val);\n\
-};\n\
-var isRegExp = function(val) {\n\
-  return '[object RegExp]' === toString.call(val);\n\
-};\n\
-\n\
-/**\n\
- * Expose `expression`.\n\
- */\n\
-\n\
-exports = module.exports = expression;\n\
-\n\
-/**\n\
- * Expose `collection`.\n\
- */\n\
-\n\
-exports.collection = {};\n\
-\n\
-/**\n\
- * Get or define an expression.\n\
- *\n\
- * @param {String} name\n\
- * @return {Expression}\n\
- * @api public\n\
- */\n\
-\n\
-function expression(name) {\n\
-  return exports.has(name)\n\
-    ? exports.collection[name]\n\
-    : exports.collection[name] = new Expression(name);\n\
-}\n\
-\n\
-/**\n\
- * Check if expression exists.\n\
- *\n\
- * @param {String} name\n\
- * @return {Boolean}\n\
- * @api public\n\
- */\n\
-\n\
-exports.has = function(name) {\n\
-  return exports.collection.hasOwnProperty(name);\n\
-};\n\
-\n\
-/**\n\
- * Instantiate a new `Expression`.\n\
- *\n\
- * @api private\n\
- */\n\
-\n\
-function Expression(name) {\n\
-  this.name = name;\n\
-  this.matchers = [];\n\
-}\n\
-\n\
-/**\n\
- * Patterns to match against.\n\
- *\n\
- * @chainable\n\
- * @api public\n\
- */\n\
-\n\
-Expression.prototype.match = function(){\n\
-  var args = slice.call(arguments);\n\
-  \n\
-  // function to return match result\n\
-  var fn = isFunction(args[args.length - 1])\n\
-    ? args.pop()\n\
-    : identityFn;\n\
-\n\
-  args = normalize(args);\n\
-\n\
-  // final function\n\
-\n\
-  function exec(str, data) {\n\
-    var result = [];\n\
-    // going to set back to initial pos if it doesn't match.\n\
-    var pos = data.pos;\n\
-    for (var i = 0, n = args.length; i < n; i++) {\n\
-      var val = args[i](str, data);\n\
-      if (null == val) {\n\
-        // set it back to original since it failed.\n\
-        data.pos = pos;\n\
-        return;\n\
-      }\n\
-      result.push(val);\n\
-    }\n\
-    return fn.apply(this, result);\n\
-  }\n\
-\n\
-  this.matchers.push(exec);\n\
-  \n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Parse input string into object\n\
- * using all of the expression's matchers.\n\
- *\n\
- * @param {String} str Input string.\n\
- * @param {Function} [fn] Callback function.\n\
- * @api public\n\
- */\n\
-\n\
-Expression.prototype.parse = function(str, fn){\n\
-  var data = { pos: 0, failures: 0 };\n\
-  var result = this._parse(str, data);\n\
-  if (data.pos < str.length) {\n\
-    var val = str.length > 20 ? str.substr(data.pos, 20) + '...' : str;\n\
-    var msg = 'Expected end of input but \"' + val + '\" found';\n\
-    var err = new SyntaxError(msg);\n\
-    if (fn) return fn(err);\n\
-    throw err;\n\
-  }\n\
-  return result;\n\
-};\n\
-\n\
-/**\n\
- * Internal parse.\n\
- *\n\
- * @param {String} str Input string.\n\
- * @param {Object} [data] Parent (starting) expression data.\n\
- * @api private\n\
- */\n\
-\n\
-Expression.prototype._parse = function(str, data){\n\
-  var matchers = this.matchers;\n\
-  var result;\n\
-\n\
-  for (var i = 0, n = matchers.length; i < n; i++) {\n\
-    result = matchers[i](str, data);\n\
-    // blank string '' also counts\n\
-    if (result != null) return result;\n\
-  }\n\
-};\n\
-\n\
-/**\n\
- * Function returning its parameter.\n\
- *\n\
- * @param {Mixed} val\n\
- * @return {Mixed} val\n\
- * @api private\n\
- */\n\
-\n\
-function identityFn(val) {\n\
-  // return slice.call(arguments);\n\
-  return val;\n\
-}\n\
-\n\
-/**\n\
- * Return's a function to match exact\n\
- * string against input string starting at \n\
- * parser's current position.\n\
- *\n\
- * @param {String} val\n\
- * @return {Function} exec\n\
- * @api private\n\
- */\n\
-\n\
-function stringFn(val) {\n\
-  var len = val.length;\n\
-\n\
-  function exec(str, data) {\n\
-    if (val === str.substr(data.pos, len)) {\n\
-      data.pos += len;\n\
-      return val;\n\
-    }\n\
-  }\n\
-\n\
-  return exec;\n\
-}\n\
-\n\
-/**\n\
- * RegExp function.\n\
- *\n\
- * @param {String} val\n\
- * @return {Function} exec\n\
- * @api private\n\
- */\n\
-\n\
-function regExpFn(val) {\n\
-  var val = val.source;\n\
-  var oneOrMore = '+' === val.substr(val.length - 1);\n\
-  var zeroOrMore = '*' === val.substr(val.length - 1);\n\
-  var many = oneOrMore || zeroOrMore;\n\
-  //var optional = '?' === val.substr(val.length - 1);\n\
-  if (many) val = val.substr(0, val.length - 1);\n\
-  var pattern = new RegExp(val);\n\
-\n\
-  if (many) {\n\
-    var exec = function exec(str, data) {\n\
-      var result = [];\n\
-      while (pattern.test(str.charAt(data.pos))) {\n\
-        result.push(str.charAt(data.pos));\n\
-        data.pos++;\n\
-      }\n\
-\n\
-      return result.length\n\
-        ? result.join('')\n\
-        : (zeroOrMore ? '' : undefined);\n\
-    }\n\
-  } else {\n\
-    var exec = function exec(str, data) {\n\
-      if (pattern.test(str.charAt(data.pos))) {\n\
-        data.pos++;\n\
-        return str.charAt(data.pos - 1);\n\
-      }\n\
-    }\n\
-  }\n\
-\n\
-  return exec;\n\
-}\n\
-\n\
-/**\n\
- * Return's a function to execute a named expression\n\
- * on the input string.\n\
- *\n\
- * @param {String} val Name of expression\n\
- * @return {Function} exec\n\
- * @api private\n\
- */\n\
-\n\
-function namedFn(val) {\n\
-  var name = val.split(':')[1];\n\
-  var oneOrMore = '+' === name.substr(name.length - 1);\n\
-  var zeroOrMore = '*' === name.substr(name.length - 1);\n\
-  var many = oneOrMore || zeroOrMore;\n\
-  var optional = '?' === name.substr(name.length - 1);\n\
-  if (many || optional)\n\
-    name = name.substr(0, name.length - 1);\n\
-  \n\
-  if (many) {\n\
-    return function exec(str, data) {\n\
-      var results = [];\n\
-      var result = expression(name)._parse(str, data);\n\
-      \n\
-      while (result != null) {\n\
-        results.push(result);\n\
-        result = expression(name)._parse(str, data);\n\
-      }\n\
-\n\
-      return results;\n\
-      // XXX: 1 or more, but length is zero case.\n\
-    }\n\
-  } else {\n\
-    return function exec(str, data) {\n\
-      var result = expression(name)._parse(str, data);\n\
-      return result;\n\
-      //return result\n\
-      //  ? result\n\
-      //  : (optional ? '' : result);\n\
-    }\n\
-  }\n\
-}\n\
-\n\
-/**\n\
- * Convert `.match` arguments into a standard format.\n\
- *\n\
- * @param {Array} args\n\
- * @api private\n\
- */\n\
-\n\
-function normalize(args) {\n\
-  for (var i = 0, n = args.length; i < n; i++) {\n\
-    var val = args[i];\n\
-    \n\
-    // XXX: here we go through all the parsing expression types:\n\
-    // https://github.com/dmajda/pegjs#parsing-expression-types\n\
-\n\
-    if (val.source) {\n\
-      // val instanceof RegExp\n\
-      val = regExpFn(val);\n\
-    } else if (/^:\\w/.test(val)) {\n\
-      // :named-expression\n\
-      val = namedFn(val);\n\
-    } else {\n\
-      // exact match\n\
-      val = stringFn(val);\n\
-    }\n\
-\n\
-    // set it to the compiled val\n\
-    args[i] = val;\n\
-  }\n\
-\n\
-  return args;\n\
-}//@ sourceURL=tower-expression/index.js"
-));
-require.register("tower-js-expressions/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var expression = require('tower-expression');\n\
-var isArray = require('part-is-array');\n\
-\n\
-/**\n\
- * Expose `expression`.\n\
- *\n\
- * list\n\
- * assignment\n\
- * conditional\n\
- * unary\n\
- * postfix\n\
- * binary\n\
- * binding\n\
- * undefined\n\
- * null\n\
- * boolean\n\
- * regexp\n\
- * number\n\
- * string\n\
- * float\n\
- * integer\n\
- * interpolation\n\
- * property-assignment\n\
- * attr\n\
- * bracket-accessor\n\
- * dot-accessor\n\
- * function\n\
- */\n\
-\n\
-module.exports = expression;\n\
-\n\
-/**\n\
- * Code expressions.\n\
- *\n\
- * The go from most-to-least complex.\n\
- *\n\
- * For now not implementing bitwise operations for directives.\n\
- */\n\
-\n\
-expression('call')\n\
-  .match(':chain');\n\
-\n\
-expression('chain')\n\
-  .match(':literal')\n\
-  .match(':function')\n\
-  .match(':accessor-chain', function($1){\n\
-    return { type: 'chain', value: isArray($1) ? $1 : [$1] };\n\
-  });\n\
-\n\
-expression('accessor-chain')\n\
-  .match(':accessor', ':accessors*', argsExpression);\n\
-\n\
-expression('assignment')\n\
-  .match(':conditional', ':ws', ':assignment-operator', ':ws', ':assignment', function(l, $2, op, $4, r){\n\
-    return { type: 'assignment', left: l, operator: op, right: r };\n\
-  })\n\
-  .match(':conditional');\n\
-\n\
-expression('conditional') // ternary ? yes : no\n\
-  .match(':logical-or', ':ws', \n\
-    '?', ':ws', ':call', ':ws',\n\
-    ':', ':ws', ':call', function(condition, $2, $3, $4, yes, $6, $7, $8, no){\n\
-      return { type: 'conditional', condition: condition, 'true': yes, 'false': no };\n\
-    })\n\
-  .match(':logical-or', function($1){\n\
-    if (!isArray($1) || $1.type === 'chain')\n\
-      return $1;\n\
-    else\n\
-      return { type: 'relational', value: isArray($1) ? $1 : [$1] };\n\
-  });\n\
-\n\
-expression('logical-or')\n\
-  .match(':logical-and', ':logical-or-end*', argsExpression);\n\
-\n\
-expression('logical-or-end')\n\
-  .match(':ws', ':logical-or-operator', ':ws', ':logical-and', binaryExpression);\n\
-\n\
-expression('logical-and')\n\
-  .match(':equality', ':logical-and-end*', argsExpression);\n\
-\n\
-expression('logical-and-end')\n\
-  .match(':ws', ':logical-and-operator', ':ws', ':equality', binaryExpression);\n\
-\n\
-expression('equality')\n\
-  .match(':relational', ':equality-end*', argsExpression);\n\
-\n\
-expression('equality-end')\n\
-  .match(':ws', ':equality-operator', ':ws', ':relational', binaryExpression);\n\
-\n\
-expression('relational')\n\
-  .match(':additive', ':relational-end*', argsExpression);\n\
-\n\
-expression('relational-end')\n\
-  .match(':ws', ':relational-operator', ':ws', ':additive', binaryExpression);\n\
-\n\
-expression('additive')\n\
-  .match(':multiplicative', ':additive-end*', argsExpression);\n\
-\n\
-expression('additive-end')\n\
-  .match(':ws', ':additive-operator', ':ws', ':multiplicative', binaryExpression);\n\
-\n\
-expression('multiplicative')\n\
-  .match(':unary', ':multiplicative-end*', argsExpression);\n\
-\n\
-expression('multiplicative-end')\n\
-  .match(':ws', ':multiplicative-operator', ':ws', ':unary', binaryExpression);\n\
-\n\
-expression('unary')\n\
-  .match(':unary-operator', ':ws', ':conditional', function(op, ws, exp){\n\
-    return { type: 'unary', operator: op, value: exp };\n\
-  })\n\
-  .match(':postfix');\n\
-\n\
-expression('postfix')\n\
-  .match(':call', ':ws', ':postfix-operator', function(exp, _, op){\n\
-    return { type: 'postfix', operator: op, value: exp };\n\
-  })\n\
-  .match(':call');\n\
-\n\
-function argsExpression(left, args) {\n\
-  if (!args.length) return left;\n\
-  args.unshift(left);\n\
-  return args;\n\
-}\n\
-\n\
-function binaryExpression($1, op, $3, exp) {\n\
-  return { type: 'binary', operator: op, value: exp };\n\
-}\n\
-\n\
-/**\n\
- * Operator expressions.\n\
- */\n\
-\n\
-expression('assignment-operator')\n\
-  .match('=', /*/[^=]/,*/ function(){\n\
-    return '=';\n\
-  })\n\
-  .match('*=')\n\
-  .match('/=')\n\
-  .match('%=')\n\
-  .match('+=')\n\
-  .match('-=');\n\
-\n\
-expression('logical-or-operator')\n\
-  .match('||', /*/[^=]/,*/ function(){\n\
-    return '||';\n\
-  });\n\
-\n\
-expression('logical-and-operator')\n\
-  .match('&&', /*/[^=]/,*/ function(){\n\
-    return '&&';\n\
-  });\n\
-\n\
-expression('equality-operator')\n\
-  .match('===')\n\
-  .match('!==')\n\
-  .match('==')\n\
-  .match('!=');\n\
-\n\
-expression('additive-operator')\n\
-  // XXX: handle NOT case\n\
-  .match('+', /*/[^+=]/,*/ function(){\n\
-    return '+';\n\
-  })\n\
-  .match(' - ', /*/[^-=]/,*/ function(){\n\
-    return '-';\n\
-  })\n\
-  //.match('-', /*/[^-=]/,*/ function(){\n\
-\n\
-expression('multiplicative-operator')\n\
-  .match('*')\n\
-  .match('/')\n\
-  .match('%');\n\
-\n\
-expression('relational-operator')\n\
-  .match('<=')\n\
-  .match('>=')\n\
-  .match('<')\n\
-  .match('>');\n\
-\n\
-expression('unary-operator')\n\
-  .match('++')\n\
-  .match('--')\n\
-  .match('!');\n\
-\n\
-expression('postfix-operator')\n\
-  .match('++')\n\
-  .match('--');\n\
-\n\
-/**\n\
- * Literals.\n\
- */\n\
-\n\
-expression('literal')\n\
-  .match(':undefined', literal('undefined'))\n\
-  .match(':null', literal('null'))\n\
-  .match(':boolean', literal('boolean'))\n\
-  .match(':float', literal('float'))\n\
-  .match(':integer', literal('integer'))\n\
-  .match(':string', literal('string'))\n\
-  .match(':regexp', literal('regexp'));\n\
-\n\
-expression('undefined')\n\
-  .match('undefined', function(){\n\
-    return undefined;\n\
-  });\n\
-\n\
-expression('null')\n\
-  .match('null', function(){\n\
-    return null;\n\
-  });\n\
-\n\
-expression('boolean')\n\
-  .match('true', function(){\n\
-    return true;\n\
-  })\n\
-  .match('false', function(){\n\
-    return false;\n\
-  });\n\
-\n\
-expression('string')\n\
-  .match(':quote', ':non-quote', ':quote', function(left, string, right){\n\
-    return string;\n\
-  });\n\
-\n\
-expression('number')\n\
-  .match(':float')\n\
-  .match(':integer');\n\
-\n\
-expression('float')\n\
-  .match(':integer', '.', ':integer', function(left, dot, right){\n\
-    return parseFloat(left + dot + right);\n\
-  });\n\
-\n\
-expression('integer')\n\
-  .match(/[0-9]+/, function(digits){\n\
-    return parseInt(digits, 10);\n\
-  });\n\
-\n\
-// XXX\n\
-expression('regexp');\n\
-\n\
-expression('hex-integer')\n\
-  .match('0', /[xX]/, ':hex-digit+', function($1, $2, digits){\n\
-    return parseInt('0x' + digits);\n\
-  });\n\
-\n\
-expression('hex-digit')\n\
-  .match(/[0-9a-fA-F]/);\n\
-\n\
-expression('string-better')\n\
-  .match('\"', ':double-quoted-string', '\"', function(l, val, r){\n\
-    return val;\n\
-  })\n\
-  .match(\"'\", ':single-quoted-string', \"'\", function(l, val, r){\n\
-    return val;\n\
-  });\n\
-\n\
-expression('double-quoted-string')\n\
-  .match(':double-quoted-string-character+');\n\
-\n\
-expression('single-quoted-string')\n\
-  .match(':single-quoted-string-character+');\n\
-\n\
-expression('double-quoted-string-character')\n\
-  .match('!:invalid-double-quoted-string-character', ':source-character', function($1, $2){\n\
-    return $2;\n\
-  })\n\
-  .match('line-continuation');\n\
-\n\
-expression('invalid-double-quoted-string-character')\n\
-  .match('\"', \"\\\\\", ':line-terminator');\n\
-\n\
-expression('single-quoted-string-character')\n\
-  .match('!:invalid-single-quoted-string-character', ':source-character', function($1, $2){\n\
-    return $2;\n\
-  })\n\
-  .match('line-continuation');\n\
-\n\
-expression('invalid-single-quoted-string-character')\n\
-  .match(\"'\", \"\\\\\", ':line-terminator');\n\
-\n\
-expression('source-character')\n\
-  .match(/./);\n\
-\n\
-function literal(type) {\n\
-  return function(val) {\n\
-    return { type: type, value: val };\n\
-  }\n\
-}\n\
-\n\
-/**\n\
- * Whitespace expressions.\n\
- */\n\
-\n\
-expression('ws')\n\
-  .match(/[ \\r\\t]*/);\n\
-\n\
-expression('line-terminator')\n\
-  .match(/[\\n\
-\\r\\u2028\\u2029]/);\n\
-\n\
-expression('end-of-line')\n\
-  .match(\"\\n\
-\")\n\
-  .match(\"\\r\\n\
-\")\n\
-  .match(\"\\r\")\n\
-  .match(/\\r/)\n\
-  .match(\"\\u2028\") // line separator\n\
-  .match(\"\\u2029\"); // paragraph separator\n\
-\n\
-expression('line-continuation')\n\
-  .match(\"\\\\\", ':end-of-line', function($1, $2){\n\
-    return $2;\n\
-  });\n\
-  \n\
-/**\n\
- * Basic expressions.\n\
- *\n\
- * @see https://github.com/dmajda/pegjs\n\
- * @see http://www.ecma-international.org/publications/files/ECMA-ST/Ecma-262.pdf\n\
- */\n\
-\n\
-expression('non-quote')\n\
-  .match(/[^'\"]+/);\n\
-\n\
-expression('quote')\n\
-  .match(/['\"]/);\n\
-\n\
-// XXX\n\
-expression('hash')\n\
-  .match(':key-value-list', function(exp){\n\
-    return { type: 'hash', value: exp };\n\
-  });\n\
-\n\
-expression('key-value-list') // PropertyNameAndValueList\n\
-  .match(':property-assignment', ':key-value-list-end*', argsExpression);\n\
-\n\
-expression('key-value-list-end')\n\
-  .match(':ws', ',', ':ws', ':property-assignment', function($1, $2, $3, exp){\n\
-    return exp;\n\
-  });\n\
-\n\
-expression('property-assignment')\n\
-  .match(':key-name', ':ws', ':', ':ws', ':conditional', function(name, $2, $3, $4, value){\n\
-    return { type: 'property-assignment', name: name, value: value };\n\
-  });\n\
-\n\
-expression('attr')\n\
-  .match(':property-name', function(name){\n\
-    return { type: 'attr', name: name };\n\
-  });\n\
-\n\
-expression('key-name')\n\
-  .match(/[\\w-]+/);\n\
-\n\
-expression('property-name')\n\
-  .match(':identifier')\n\
-  .match(':string')\n\
-  .match(':number');\n\
-\n\
-expression('identifier')\n\
-  .match(/\\w+/);\n\
-\n\
-expression('accessors')\n\
-  .match(':dot-accessor')\n\
-  .match(':bracket-accessor');\n\
-\n\
-expression('bracket-accessor')\n\
-  .match(':ws', '[', ':ws', ':conditional', ':ws', ']', function($1, $2, $3, exp){\n\
-    return { type: 'bracket-accessor', value: exp };\n\
-  });\n\
-\n\
-expression('dot-accessor')\n\
-  .match(':ws', '.', ':ws', ':accessor', function($1, $2, $3, exp){\n\
-    return { type: 'dot-accessor', value: exp };\n\
-  });\n\
-  \n\
-expression('accessor')\n\
-  .match(':literal')\n\
-  .match(':attr');\n\
-\n\
-expression('function')\n\
-  .match(':property-name', ':arguments', function(name, args){\n\
-    return { type: 'function', name: name, arguments: args };\n\
-  })\n\
-  .match(':property-name', '()', function(name, args){\n\
-    return { type: 'function', name: name, arguments: [] };\n\
-  });\n\
-\n\
-expression('arguments')\n\
-  .match('(', ':ws', ':argument-list', ':ws', ')', function(l, _, args, __, r){\n\
-    return { type: 'arguments', value: args };\n\
-  });\n\
-  \n\
-expression('argument-list')\n\
-  .match(':conditional', ':argument-list-end*', function(first, rest){\n\
-    rest.unshift(first);\n\
-    return rest;\n\
-  });\n\
-\n\
-expression('argument-list-end')\n\
-  .match(':ws', ',', ':ws', ':conditional', function($1, $2, $3, arg){\n\
-    return arg;\n\
-  });//@ sourceURL=tower-js-expressions/index.js"
-));
-require.register("tower-filter/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Expose `filter`.\n\
- */\n\
-\n\
-exports = module.exports = filter;\n\
-\n\
-/**\n\
- * Expose `collection`.\n\
- */\n\
-\n\
-exports.collection = {};\n\
-\n\
-/**\n\
- * Filter for DOM directives.\n\
- *\n\
- * @param {String} name\n\
- * @param {Function} fn\n\
- */\n\
-\n\
-function filter(name, fn) {\n\
-  if (!fn && exports.collection[name])\n\
-    return exports.collection[name];\n\
-\n\
-  return exports.collection[name] = fn;\n\
-}//@ sourceURL=tower-filter/index.js"
-));
-require.register("tower-directive-expression/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var expression = require('tower-expression');\n\
-// XXX: maybe there is a way to ignore this if you've precompiled?\n\
-var Compiler = require('./lib/compiler');\n\
-var Path = require('./lib/path');\n\
-require('./lib/expressions');\n\
-\n\
-/**\n\
- * Expose `Path`.\n\
- */\n\
-\n\
-exports.Path = Path;\n\
-\n\
-/**\n\
- * Expose `compile`.\n\
- */\n\
-\n\
-exports = module.exports = compile;\n\
-\n\
-/**\n\
- * Compile a directive expression.\n\
- *\n\
- * If you precompile them, you can \n\
- * write them to the hash manually.\n\
- *\n\
- *    compile('data-value', 'post[attr.name]', precompiledFn, [ 'post', 'attr', 'attr.name' ]);\n\
- *    compile('data-text', 'post.title', precompiledFn, [ 'post', 'post.title' ]);\n\
- *\n\
- * @param {String} name\n\
- */\n\
-\n\
-function compile(name, val, opts) {\n\
-  if (!opts) {\n\
-    var exp = compileExpression(name, val);\n\
-  } else {\n\
-    var exp = new DirectiveExpression(name, val, opts); \n\
-  }\n\
-  return exp;\n\
-}\n\
-\n\
-function compileListNode(name, val, node) {\n\
-  var exp = new DirectiveExpression(name, val);\n\
-\n\
-  switch (node.object.type) {\n\
-    case 'key-val':\n\
-      var obj = node.object.val;\n\
-      exp.key = compileNode('attr', null, obj.key);\n\
-      exp.val = compileNode('attr', null, obj.val);\n\
-      break;\n\
-    default:\n\
-      exp.val = node.object.name;\n\
-      break;\n\
-  }\n\
-\n\
-  exp.col = compileNode('data-value', null, node.array);\n\
-  exp.edges = exp.col.edges;\n\
-  // exp.edges = exp.col.edges.concat(exp.val.edges);\n\
-  // if (exp.key) exp.edges = exp.edges.concat(exp.key.edges);\n\
-\n\
-  return exp;\n\
-}\n\
-\n\
-function compileNode(name, val, node) {\n\
-  var compiler = (new Compiler(node)).compile();\n\
-  return new DirectiveExpression(name, val, compiler);\n\
-}\n\
-\n\
-function compileExpression(name, val) {\n\
-  var node = expression(name).parse(val);\n\
-  var exp;\n\
-\n\
-  switch (node.type) {\n\
-    case 'list':\n\
-      exp = compileListNode(name, val, node);\n\
-      break;\n\
-    //case 'hash':\n\
-    //  break;\n\
-    default:\n\
-      exp = compileNode(name, val, node);\n\
-      break;\n\
-  }\n\
-\n\
-  return exp;\n\
-}\n\
-\n\
-/**\n\
- * Instantiate a new `DirectiveExpression`.\n\
- */\n\
-\n\
-function DirectiveExpression(name, val, opts) {\n\
-  for (var key in opts) {\n\
-    if (opts.hasOwnProperty(key))\n\
-      this[key] = opts[key];\n\
-  }\n\
-  this.name = name;\n\
-  this.val = val;\n\
-  this.edges = this.edges || [];\n\
-  this.paths = [];\n\
-  \n\
-  for (var i = 0, n = this.edges.length; i < n; i++) {\n\
-    this.paths.push(new Path(this.edges[i]));\n\
-  }\n\
-}\n\
-\n\
-/**\n\
- * Watch a scope based on expression dependencies.\n\
- */\n\
-\n\
-DirectiveExpression.prototype.watch = function(scope, fn){\n\
-  var fns = [];\n\
-\n\
-  for (var i = 0, n = this.paths.length; i < n; i++) {\n\
-    fns.push(this.paths[i].watch(scope, fn));\n\
-  }\n\
-\n\
-  // function to unwatch all children.\n\
-\n\
-  function unwatch() {\n\
-    for (var i = 0, n = fns.length; i < n; i++) {\n\
-      fns[i]();\n\
-    }\n\
-  }\n\
-\n\
-  return unwatch;\n\
-};//@ sourceURL=tower-directive-expression/index.js"
-));
-require.register("tower-directive-expression/lib/compiler.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-require('tower-js-expressions'); // parsing expression grammar\n\
-var filter = require('tower-filter');\n\
-var isArray = require('part-is-array');\n\
-\n\
-/**\n\
- * Expose `Compiler`.\n\
- */\n\
-\n\
-module.exports = Compiler;\n\
-\n\
-/**\n\
- * Compiler helper.\n\
- */\n\
-\n\
-var access = \"2 === arguments.length ? 'set' : 'get'\";\n\
-\n\
-/**\n\
- * Instantiate a new `Compiler`.\n\
- */\n\
-\n\
-function Compiler(node) {\n\
-  this.node = node;\n\
-}\n\
-\n\
-/**\n\
- * Compile parse tree to JavaScript.\n\
- */\n\
-\n\
-Compiler.prototype.compile = function(){\n\
-  try {\n\
-    this.buf = [];\n\
-    this.chain = [];\n\
-    this.filters = [];\n\
-    this.indent = '  ';\n\
-    this.visit(this.node, true, true);\n\
-    // maybe do it so it's `this.filter`\n\
-    var internalFn = Function('scope, val', this.indent + 'return ' + this.buf.join('') + ';');\n\
-    var self = this;\n\
-\n\
-    function fn(scope, val) {\n\
-      var res = valFn.apply(this, arguments);\n\
-      if (self.filters.length) {\n\
-        for (var i = 0, n = self.filters.length; i < n; i++) {\n\
-          res = self.filters[i].fn(scope, res);\n\
-        }\n\
-      }\n\
-      return res;\n\
-    }\n\
-\n\
-    function valFn(scope, val) {\n\
-      if (2 === arguments.length)\n\
-        return internalFn(filter, scope, val);\n\
-      else\n\
-        return internalFn(filter, scope);\n\
-    }\n\
-\n\
-    var fn = internalFn;\n\
-\n\
-    fn.bindTo = !!this.bindTo;\n\
-    fn.bindFrom = !!this.bindFrom;\n\
-    fn.deps = this.deps;\n\
-\n\
-    this.edges = this.chain;\n\
-    // clean up memory.\n\
-    //delete this.node;\n\
-    //delete this.buf;\n\
-    delete this.indent;\n\
-    this.fn = fn;\n\
-    return this;\n\
-  } catch (err) {\n\
-    console.log('Compiler error: ' + this.buf.join(''));\n\
-    throw err;\n\
-  }\n\
-};\n\
-\n\
-/**\n\
- * Visit `node`.\n\
- *\n\
- * @param {Node} node\n\
- * @api public\n\
- */\n\
-\n\
-Compiler.prototype.visit = function(node, terminal){\n\
-  // XXX: should make into { type: 'chain' };\n\
-  // b.c there is type \"chain\" and type \"multi\"\n\
-  // where chain is for user.x.y.z(), while multi\n\
-  // is for filters, like user.x.y.z() | sort...\n\
-\n\
-  switch (node.type) {\n\
-    case 'string':\n\
-      return this.visitStringLiteral(node, terminal);\n\
-    case 'float':\n\
-    case 'integer':\n\
-    case 'boolean':\n\
-    case 'regnode':\n\
-    case 'null':\n\
-    case 'undefined':\n\
-      return this.visitLiteral(node);\n\
-    case 'filter':\n\
-      return this.visitFilter(node);\n\
-    case 'filters':\n\
-      return this.visitFilters(node);\n\
-    case 'helper':\n\
-      return this.visitHelper(node);\n\
-    case 'attr':\n\
-      return this.visitAttr(node, terminal);\n\
-    case 'chain':\n\
-      return this.visitChain(node.value, terminal);\n\
-    // unary and postfix just work with operator\n\
-    case 'postfix':\n\
-      return this.visitPostfix(node);\n\
-    case 'unary':\n\
-      return this.visitUnary(node, terminal);\n\
-    case 'binary':\n\
-      return this.visitBinary(node, terminal);\n\
-    case 'binding':\n\
-      return this.visitBinding(node, terminal);\n\
-    case 'function':\n\
-      return this.visitFunction(node, terminal);\n\
-    case 'bracket-accessor':\n\
-      return this.visitBracket(node.value, terminal);\n\
-    case 'dot-accessor':\n\
-      return this.visitDot(node.value, terminal);\n\
-    case 'conditional':\n\
-      return this.visitTernary(node, terminal);\n\
-    case 'relational':\n\
-      return this.visitRelational(node.value, terminal);\n\
-    case 'interpolation':\n\
-      return this.visitInterpolation(node, false);\n\
-    case 'interpolated-hash':\n\
-    case 'hash':\n\
-      return this.visitHash(node, terminal);\n\
-    case 'interpolated-string':\n\
-      return this.visitInterpolatedString(node, terminal);\n\
-    case 'list':\n\
-      return this.visitList(node, terminal);\n\
-  }\n\
-};\n\
-\n\
-Compiler.prototype.visitChain = function(nodes, terminal){\n\
-  if (terminal)\n\
-    this.buf.push('scope[' + access + ']');\n\
-  else\n\
-    this.buf.push('scope.get');\n\
-\n\
-  this.buf.push('(');\n\
-  var chain = [];\n\
-  var parent = this.chain;\n\
-  this.chain.push(chain);\n\
-  this.chain = chain;\n\
-  \n\
-  for (var i = 0, n = nodes.length; i < n; i++) {\n\
-    this.visit(nodes[i]);\n\
-  }\n\
-\n\
-  //this.chains.pop();\n\
-  this.chain = parent;\n\
-\n\
-  if (terminal)\n\
-    this.buf.push(', val');\n\
-  this.buf.push(')');\n\
-};\n\
-\n\
-/**\n\
- * Visit literal `node`.\n\
- *\n\
- * @param {Literal} node\n\
- * @api public\n\
- */\n\
-\n\
-Compiler.prototype.visitLiteral = function(node){\n\
-  this.buf.push(node.value);\n\
-};\n\
-\n\
-Compiler.prototype.visitRelational = function(nodes, terminal){\n\
-  for (var i = 0, n = nodes.length; i < n; i++) {\n\
-    this.visit(nodes[i]);\n\
-  }\n\
-};\n\
-\n\
-Compiler.prototype.visitStringLiteral = function(node, terminal){\n\
-  this.buf.push('\"' + node.value + '\"');\n\
-};\n\
-\n\
-Compiler.prototype.visitAttr = function(node, terminal){\n\
-  this.chain.push(node.name);\n\
-  this.buf.push(\"'\" + node.name + \"'\");\n\
-};\n\
-\n\
-Compiler.prototype.visitPostfix = function(node){\n\
-  this.visit(node.value);\n\
-  this.buf.push('++');\n\
-};\n\
-\n\
-Compiler.prototype.visitUnary = function(node, terminal){\n\
-  this.buf.push('!');\n\
-  this.visit(node.value, terminal);\n\
-};\n\
-\n\
-Compiler.prototype.visitBinary = function(node, terminal){\n\
-  this.buf.push(' ' + node.operator + ' ');\n\
-  this.visit(node.value, terminal);\n\
-};\n\
-\n\
-Compiler.prototype.visitTernary = function(node, terminal){\n\
-  var indent = this.indent;\n\
-  this.indent += '  ';\n\
-  this.buf.push('(');\n\
-  this.visit(node.condition, false)\n\
-  this.buf.push('\\n\
-' + this.indent + '? ');\n\
-  this.visit(node['true'], terminal);\n\
-  this.buf.push('\\n\
-' + this.indent + ': ');\n\
-  this.visit(node['false'], terminal);\n\
-  this.buf.push(')');\n\
-  this.indent = indent;\n\
-};\n\
-\n\
-Compiler.prototype.visitBracket = function(node, terminal){\n\
-  this.buf.push(\" + '.' + \");\n\
-  this.visit(node);\n\
-};\n\
-\n\
-Compiler.prototype.visitDot = function(node){\n\
-  this.chain.push(node.name);\n\
-  this.buf.push(\" + '.\" + node.name + \"'\");\n\
-};\n\
-\n\
-Compiler.prototype.visitInterpolation = function(node, terminal){\n\
-  this.buf.push('(');\n\
-  this.visit(node.value, false);\n\
-  this.buf.push(')');\n\
-};\n\
-\n\
-Compiler.prototype.visitBinding = function(node){\n\
-  this.visit(node.value, true);\n\
-\n\
-  switch (node.operator) {\n\
-    case '+':\n\
-      this.bindTo = true;\n\
-      break\n\
-    case '-':\n\
-      this.bindFrom = true;\n\
-      break;\n\
-    case '=':\n\
-      this.bindTo = this.bindFrom = true;\n\
-      break;\n\
-  }\n\
-};\n\
-\n\
-Compiler.prototype.visitHash = function(node){\n\
-  // XXX: normalize these to always be array\n\
-  var indent = this.indent;\n\
-  this.indent += '  ';\n\
-  this.buf.push('{\\n\
-');\n\
-\n\
-  if (node.value.length) {\n\
-    for (var i = 0, n = node.value.length; i < n; i++) {\n\
-      var exp = node.value[i];\n\
-      this.buf.push(this.indent + propName(exp.name) + ': ');\n\
-      this.visit(exp.value, true);\n\
-      if (i !== n - 1)\n\
-        this.buf.push(',\\n\
-');\n\
-      else\n\
-        this.buf.push('\\n\
-');\n\
-    }\n\
-  } else {\n\
-    var exp = node.value;\n\
-    this.buf.push(this.indent + propName(exp.name) + ': ');\n\
-    this.visit(exp.value, true);\n\
-    this.buf.push('\\n\
-');\n\
-  }\n\
-  this.indent = indent;\n\
-  this.buf.push(this.indent + '}');\n\
-};\n\
-\n\
-Compiler.prototype.visitInterpolatedString = function(node){\n\
-  var nodes = node.value;\n\
-  for (var i = 0, n = nodes.length; i < n; i++) {\n\
-    this.visit(nodes[i], true, true);\n\
-    if (i !== n - 1)\n\
-      this.buf.push(' + ');\n\
-  }\n\
-};\n\
-\n\
-// XXX: vs. a helper function.\n\
-Compiler.prototype.visitMethod = function(){\n\
-\n\
-};\n\
-\n\
-Compiler.prototype.visitFunction = function(node){\n\
-  // { type: 'function', name: 'getTitle', arguments: [] }\n\
-  this.buf.push(\"scope.call('\" + node.name + \"'\");\n\
-  var args = node.arguments;\n\
-  if (args.type) args = args.value;\n\
-  if (args.length) {\n\
-    for (var i = 0, n = args.length; i < n; i++) {\n\
-      this.buf.push(', ');\n\
-      this.visit(args[i], true);\n\
-    }\n\
-  }\n\
-  this.buf.push(')');\n\
-};\n\
-\n\
-Compiler.prototype.visitFilter = function(node){\n\
-  // { type: 'filter', value: { ... } }\n\
-  this.filters.push(new Compiler(node.value).compile());\n\
-};\n\
-\n\
-Compiler.prototype.visitFilters = function(node){\n\
-  this.visit(node.value);\n\
-\n\
-  for (var i = 0, n = node.filters.length; i < n; i++) {\n\
-    this.visitFilter(node.filters[i]);\n\
-  }\n\
-};\n\
-\n\
-Compiler.prototype.visitHelper = function(node){\n\
-  this.buf.push(\"filter('\" + node.value + \"')(val\");\n\
-  \n\
-  var args = null != node.arguments\n\
-    ? isArray(node.arguments)\n\
-      ? node.arguments\n\
-      : [node.arguments]\n\
-    : [];\n\
-\n\
-  if (args.length) {\n\
-    for (var i = 0, n = args.length; i < n; i++) {\n\
-      this.buf.push(', ');\n\
-      this.visit(args[i], true);\n\
-    }\n\
-  }\n\
-\n\
-  this.buf.push(')');\n\
-};\n\
-\n\
-function propName(name) {\n\
-  return !/^\\w+$/.test(name)\n\
-    ? \"'\" + name + \"'\"\n\
-    : name;\n\
-}//@ sourceURL=tower-directive-expression/lib/compiler.js"
-));
-require.register("tower-directive-expression/lib/expressions.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var expression = require('tower-expression');\n\
-var isArray = require('part-is-array');\n\
-\n\
-/**\n\
- * Filter expressions.\n\
- */\n\
-\n\
-expression('directive-value')\n\
-  .match(':conditional', ':directive-filters', function($1, $2){\n\
-    return { type: 'filters', value: $1, filters: isArray($2) ? $2 : [$2] };\n\
-  });\n\
-\n\
-expression('directive-filters')\n\
-  .match(':directive-filter', ':directive-filter*', argsExpression);\n\
-\n\
-expression('directive-filter')\n\
-  .match(':ws', '|', ':ws', ':directive-filter-expression', function($1, $2, $3, $4){\n\
-    return { type: 'filter', value: $4 };\n\
-  });\n\
-\n\
-expression('directive-filter-expression')\n\
-  .match(':directive-helper');\n\
-\n\
-expression('directive-helper')\n\
-  // XXX: to robustify, make `:conditional` to `:interpolated-hash`\n\
-  .match(':attr', ':ws', ':', ':ws', ':conditional', function($1, $2, $3, $4, $5){\n\
-    return { type: 'helper', value: $1.name, arguments: $5 };\n\
-  })\n\
-  .match(':attr', function($1){\n\
-    return { type: 'helper', value: $1.name };\n\
-  });\n\
-\n\
-/**\n\
- * Interpolation Expressions.\n\
- */\n\
-\n\
-expression('interpolated-hash')\n\
-  .match(':interpolated-key-value-list', function($1){\n\
-    return { type: 'interpolated-hash', value: $1 };\n\
-  })\n\
-  .match(':hash');\n\
-\n\
-expression('interpolated-key-value-list') // PropertyNameAndValueList\n\
-  .match(':interpolated-property-assignment', ':interpolated-key-value-list-end*', argsExpression)\n\
-  .match(':interpolated-property-assignment');\n\
-\n\
-expression('interpolated-key-value-list-end')\n\
-  .match(':ws', /[,;]/, ':ws', ':interpolated-property-assignment', function($1, $2, $3, exp){\n\
-    return exp;\n\
-  });\n\
-\n\
-expression('interpolated-property-assignment')\n\
-  .match(':key-name', ':ws', ':', ':ws', ':interpolated-string', function(name, $2, $3, $4, value){\n\
-    return { type: 'interpolated-property-assignment', name: name, value: value };\n\
-  });\n\
-\n\
-expression('interpolated-string')\n\
-  // XXX: handle blank\n\
-  .match(':interpolated-statement', ':interpolated-statement*', function($1, $2){\n\
-    if ($2) {\n\
-      for (var i = 0, n = $2.length; i < n; i++) {\n\
-        $1 = $1.concat($2[i]);\n\
-      }\n\
-    }\n\
-\n\
-    return { type: 'interpolated-string', value: isArray($1) ? $1 : [$1] };\n\
-  });\n\
-\n\
-expression('interpolated-statement')\n\
-  //.match(/[^\\{]+/, '{{', /[^\\}]+/, '}}', function($1, $2, $3, $4){\n\
-  .match(':non-interpolation', ':interpolation', ':non-interpolation', function($1, $2, $3){\n\
-    var arr = [ { type: 'string', value: $1 }, $2 ];\n\
-    if ($3) arr.push({ type: 'string', value: $3 });\n\
-    return arr;\n\
-  });\n\
-\n\
-expression('interpolation')\n\
-  // XXX: maybe should be ':call'\n\
-  .match('{{', ':ws', ':conditional', ':ws', '}}', function($1, $2, exp, $4, $5){\n\
-    return { type: 'interpolation', value: exp };\n\
-  });\n\
-\n\
-expression('non-interpolation')\n\
-  .match(/[^\\{,]*/);\n\
-\n\
-/**\n\
- * Iterator expressions.\n\
- */\n\
-\n\
-expression('for-in')\n\
-  .match(':attr', ':ws', ',', ':ws', ':attr', function($1, $2, $3, $4, $5){\n\
-    return { type: 'key-val', val: { key: $1, val: $5 } };\n\
-  })\n\
-  .match(':attr');\n\
-\n\
-expression('data-list')\n\
-  .match(':for-in', ':ws', 'in', ':ws', ':conditional', function(obj, $2, $3, $4, arr){\n\
-    return { type: 'list', object: obj, array: arr };\n\
-  });\n\
-\n\
-expression('directive-options')\n\
-  .match('[', ':ws', ':key-value-list', ':ws', ']', function($1, $2, opts, $4, $5){\n\
-    return opts;\n\
-  });\n\
-\n\
-/**\n\
- * Basic attribute expressions.\n\
- */\n\
-\n\
-expression('data-value')\n\
-  .match(':directive-binding', ':conditional', bindingExpression)\n\
-  .match(':interpolated-string')\n\
-  .match(':conditional');\n\
-\n\
-expression('data-style')\n\
-  .match(':interpolated-hash')\n\
-  // XXX: comma separated\n\
-  //.match(':conditionals')\n\
-  .match(':conditional')\n\
-  .match(':interpolated-string');\n\
-\n\
-expression('data-class')\n\
-  .match(':hash')\n\
-  // XXX: comma separated\n\
-  //.match(':conditionals')\n\
-  .match(':conditional')\n\
-  .match(':interpolated-string');\n\
-\n\
-expression('conditionals')\n\
-  .match(':conditional', ':conditionals-end*', function($1, $2){\n\
-    $2.unshift($1);\n\
-    return { type: 'array', val: $2 };\n\
-  });\n\
-\n\
-expression('conditionals-end')\n\
-  .match(':ws', ',', ':ws', ':conditional', function($1, $2, $3, $4){\n\
-    return $4;\n\
-  });\n\
-\n\
-expression('directive-class')\n\
-  .match(':directive-binding', ':key-value-list', bindingObjectExpression)\n\
-  .match(':key-value-list', hashExpression);\n\
-  \n\
-// [+], [-], [=]\n\
-expression('directive-binding')\n\
-  .match('[', /[\\+-=]/, ']', ':ws', function(l, op, r){\n\
-    return op;\n\
-  });\n\
-\n\
-function bindingExpression(op, exp) {\n\
-  return { type: 'binding', operator: op, value: exp };\n\
-}\n\
-\n\
-function bindingObjectExpression(op, exp) {\n\
-  return { type: 'binding', operator: op, props: exp };\n\
-}\n\
-\n\
-function hashExpression(exp) {\n\
-  return { type: 'hash', value: exp };\n\
-}\n\
-\n\
-function argsExpression(left, args) {\n\
-  if (!args.length) return left;\n\
-  args.unshift(left);\n\
-  return args;\n\
-}//@ sourceURL=tower-directive-expression/lib/expressions.js"
-));
-require.register("tower-directive-expression/lib/path.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var isArray = require('part-is-array');\n\
-\n\
-/**\n\
- * Expose `Path`.\n\
- */\n\
-\n\
-module.exports = Path;\n\
-\n\
-/**\n\
- * Watch path.\n\
- */\n\
-\n\
-function Path(edges) {\n\
-  // this thing listens for changes on scope, and then\n\
-  // updates the top-most edges.\n\
-  // this doesn't trigger DOM/UI updates, it just triggers\n\
-  // property updates, which might trigger DOM updates.\n\
-  for (var i = 0, n = edges.length; i < n; i++) {\n\
-    if (isArray(edges[i]))\n\
-      edges[i] = new Path(edges[i]);\n\
-  }\n\
-  this.edges = edges;\n\
-}\n\
-\n\
-// XXX: this should return a function so you can unwatch for this specific scope.\n\
-Path.prototype.watch = function(scope, fn){\n\
-  var self = this;\n\
-  var edge;\n\
-  var childrenToUnwatch = [];\n\
-  var child;\n\
-\n\
-  // watch edges\n\
-  for (var i = 0, n = this.edges.length; i < n; i++) {\n\
-    if (self.edges[i] instanceof Path) {\n\
-      child = self.edges[i].watch(scope, update);\n\
-      childrenToUnwatch.push(child);\n\
-      edge = edge + '.' + scope.get(child.edge);\n\
-    } else {\n\
-      edge = edge ? edge + '.' + self.edges[i] : self.edges[i];\n\
-    }\n\
-  }\n\
-\n\
-  var prev = edge;\n\
-\n\
-  function update() {\n\
-    edge = self.compute(scope);\n\
-    if (prev) {\n\
-      if (prev === edge) return edge;\n\
-      scope.edge(prev).off('change', fn);\n\
-      scope.edge(edge).on('change', fn);\n\
-      fn();\n\
-    }\n\
-  }\n\
-\n\
-  scope.edge(edge).on('change', fn);\n\
-\n\
-  function unwatch() {\n\
-    scope.edge(edge).off('change', fn);\n\
-    for (var i = 0, n = childrenToUnwatch.length; i < n; i++) {\n\
-      childrenToUnwatch[i]();\n\
-    }\n\
-  }\n\
-\n\
-  unwatch.edge = edge;\n\
-\n\
-  return unwatch;\n\
-};\n\
-\n\
-Path.prototype.compute = function(scope){\n\
-  var edge;\n\
-  for (var i = 0, n = this.edges.length; i < n; i++) {\n\
-    if (this.edges[i] instanceof Path) {\n\
-      edge = edge + '.' + scope.get(this.edges[i].compute(scope));\n\
-    } else {\n\
-      edge = edge ? edge + '.' + this.edges[i] : this.edges[i];\n\
-    }\n\
-  }\n\
-  return edge;\n\
-};//@ sourceURL=tower-directive-expression/lib/path.js"
-));
-require.register("component-value/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var typeOf = require('type');\n\
-\n\
-/**\n\
- * Set or get `el`'s' value.\n\
- *\n\
- * @param {Element} el\n\
- * @param {Mixed} val\n\
- * @return {Mixed}\n\
- * @api public\n\
- */\n\
-\n\
-module.exports = function(el, val){\n\
-  if (2 == arguments.length) return set(el, val);\n\
-  return get(el);\n\
-};\n\
-\n\
-/**\n\
- * Get `el`'s value.\n\
- */\n\
-\n\
-function get(el) {\n\
-  switch (type(el)) {\n\
-    case 'checkbox':\n\
-    case 'radio':\n\
-      if (el.checked) {\n\
-        var attr = el.getAttribute('value');\n\
-        return null == attr ? true : attr;\n\
-      } else {\n\
-        return false;\n\
-      }\n\
-    case 'radiogroup':\n\
-      for (var i = 0, radio; radio = el[i]; i++) {\n\
-        if (radio.checked) return radio.value;\n\
-      }\n\
-      break;\n\
-    case 'select':\n\
-      for (var i = 0, option; option = el.options[i]; i++) {\n\
-        if (option.selected) return option.value;\n\
-      }\n\
-      break;\n\
-    default:\n\
-      return el.value;\n\
-  }\n\
-}\n\
-\n\
-/**\n\
- * Set `el`'s value.\n\
- */\n\
-\n\
-function set(el, val) {\n\
-  switch (type(el)) {\n\
-    case 'checkbox':\n\
-    case 'radio':\n\
-      if (val) {\n\
-        el.checked = true;\n\
-      } else {\n\
-        el.checked = false;\n\
-      }\n\
-      break;\n\
-    case 'radiogroup':\n\
-      for (var i = 0, radio; radio = el[i]; i++) {\n\
-        radio.checked = radio.value === val;\n\
-      }\n\
-      break;\n\
-    case 'select':\n\
-      for (var i = 0, option; option = el.options[i]; i++) {\n\
-        option.selected = option.value === val;\n\
-      }\n\
-      break;\n\
-    default:\n\
-      el.value = val;\n\
-  }\n\
-}\n\
-\n\
-/**\n\
- * Element type.\n\
- */\n\
-\n\
-function type(el) {\n\
-  var group = 'array' == typeOf(el) || 'object' == typeOf(el);\n\
-  if (group) el = el[0];\n\
-  var name = el.nodeName.toLowerCase();\n\
-  var type = el.getAttribute('type');\n\
-\n\
-  if (group && type && 'radio' == type.toLowerCase()) return 'radiogroup';\n\
-  if ('input' == name && type && 'checkbox' == type.toLowerCase()) return 'checkbox';\n\
-  if ('input' == name && type && 'radio' == type.toLowerCase()) return 'radio';\n\
-  if ('select' == name) return 'select';\n\
-  return name;\n\
-}\n\
-//@ sourceURL=component-value/index.js"
-));
-require.register("tower-directive/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var Emitter = require('tower-emitter');\n\
-var compile = require('tower-directive-expression');\n\
-var content = require('tower-content');\n\
-var statics = require('./lib/statics');\n\
-var proto = require('./lib/proto');\n\
-\n\
-/**\n\
- * Global document (for client and server).\n\
- */\n\
-\n\
-var document = 'undefined' === typeof document\n\
-  ? undefined // tower/server-dom\n\
-  : window.document;\n\
-\n\
-/**\n\
- * Expose `directive`.\n\
- */\n\
-\n\
-exports = module.exports = directive;\n\
-\n\
-/**\n\
- * Expose `collection`.\n\
- */\n\
-\n\
-exports.collection = [];\n\
-\n\
-/**\n\
- * Get/set directive function.\n\
- * \n\
- * @param {String} name The directive's name.\n\
- * @param {Function} fn Function called on directive definition.\n\
- * @return {Directive} A `Directive` object.\n\
- * @api public\n\
- */\n\
-\n\
-function directive(name, fn, manualCompile) {\n\
-  if (undefined === fn && exports.collection[name])\n\
-    return exports.collection[name];\n\
-\n\
-  /**\n\
-   * Class representing the extensions to HTML.\n\
-   *\n\
-   * @class\n\
-   *\n\
-   * @param {String} name The directive's name.\n\
-   * @param {Function} The directive function to be executed.\n\
-   * @api private\n\
-   */\n\
-\n\
-  function Directive(el, attrs) {\n\
-    this.name = name;\n\
-    this.attrs = attrs;\n\
-    this.document = document;\n\
-\n\
-    // attribute, text, element, comment\n\
-    if (1 === el.nodeType) {\n\
-      if (this.element) {\n\
-        // XXX: compile attributes for element?\n\
-      } else if (this.attribute) {\n\
-        var val = el.getAttribute(this.name);\n\
-        if (val) {\n\
-          attrs[this.name] = exports.expression(Directive._expression, val);\n\
-        }\n\
-      }\n\
-    }\n\
-  }\n\
-\n\
-  Directive.id = name;\n\
-  Directive.expressions = {};\n\
-  Directive.prototype.attribute = true;\n\
-  Directive.prototype.processChildren = true;\n\
-\n\
-  if (fn) {\n\
-    if (manualCompile || 1 === fn.length) {\n\
-      Directive._compile = fn;\n\
-    } else {\n\
-      Directive._exec = fn;\n\
-    }\n\
-  }\n\
-\n\
-  for (var key in statics) Directive[key] = statics[key];\n\
-  for (var key in proto) Directive.prototype[key] = proto[key];\n\
-\n\
-  exports.collection[name] = Directive;\n\
-  exports.collection.push(Directive);\n\
-  exports.emit('define', Directive);\n\
-  return Directive;\n\
-}\n\
-\n\
-/**\n\
- * Mixin `Emitter`.\n\
- */\n\
-\n\
-Emitter(exports);\n\
-\n\
-/**\n\
- * Get/compile directive expression.\n\
- */\n\
-\n\
-exports.expression = function(name, val, opts, fn){\n\
-  var Directive = exports(name);\n\
-  return Directive.expressions[val]\n\
-    = Directive.expressions[val]\n\
-    || compile.apply(null, arguments);\n\
-};\n\
-\n\
-/**\n\
- * Check if a directive is defined.\n\
- *\n\
- * @param {String} name A directive name.\n\
- * @return {Boolean} true if the `Directive` has been defined, but false otherwise\n\
- * @api public\n\
- */\n\
-\n\
-exports.defined = function(name){\n\
-  return exports.collection.hasOwnProperty(name);\n\
-};\n\
-\n\
-/**\n\
- * Clear all directives.\n\
- *\n\
- * @chainable\n\
- * @return {Function} exports The main `directive` function.\n\
- * @api public\n\
- */\n\
-\n\
-exports.clear = function(){\n\
-  exports.off();\n\
-  exports.collection = [];\n\
-  return exports;\n\
-};//@ sourceURL=tower-directive/index.js"
-));
-require.register("tower-directive/lib/statics.js", Function("exports, require, module",
-"\n\
-/**\n\
- * XXX: The only types of els this can be defined on.\n\
- *\n\
- * Comment/Script/el/Text\n\
- *\n\
- * @chainable\n\
- * @return {Function} exports The main `directive` function.\n\
- */\n\
-\n\
-exports.type = function(name){\n\
-  this.prototype[name] = true;\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * @chainable\n\
- */\n\
-\n\
-exports.meta = function(val){\n\
-  this.prototype.meta = null == val ? true : val;\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Custom expression name.\n\
- * @chainable\n\
- */\n\
-\n\
-exports.expression = function(name){\n\
-  this._expression = name;\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Default expression.\n\
- */\n\
-\n\
-exports._expression = 'data-value';\n\
-\n\
-/**\n\
- * Sorting priority.\n\
- *\n\
- * Higher means it gets moved toward the front.\n\
- *\n\
- * @chainable\n\
- * @param {Integer} val Defaults to 0.\n\
- * @return {Function} exports The main `directive` function.\n\
- */\n\
-\n\
-exports.priority = function(val){\n\
-  this.prototype.priority = val;\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Tells template whether it should continue\n\
- * and process childNodes of element.\n\
- */\n\
-\n\
-exports.processChildren = function(val){\n\
-  this.prototype.processChildren = false === val ? false : true;\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Terminal.\n\
- *\n\
- * If set to true, it will stop processing the template right there.\n\
- * Then it is up to the directive itself to handling creating sub-templates.\n\
- * This is used mainly for creating iterators.\n\
- *\n\
- * @chainable\n\
- * @param {Boolean} [val]\n\
- * @return {Directive} this\n\
- */\n\
-\n\
-exports.terminal = function(val){\n\
-  this.prototype.terminal = false === val ? false : true;\n\
-  return this;\n\
-};//@ sourceURL=tower-directive/lib/statics.js"
-));
-require.register("tower-directive/lib/proto.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Return optimized function for use in templates.\n\
- *\n\
- * @param {DOMNode} el el used for template.\n\
- * @param {Function} nodeFn The template function used for transclusion.\n\
- * @return {Object} A scope.\n\
- * @api private\n\
- */\n\
-\n\
-exports.compile = function(el, nodeFn){\n\
-  var obj = this;\n\
-  var attrs = this.attrs;\n\
-  var exp = attrs[this.name];\n\
-\n\
-  var fn = this.constructor._exec\n\
-    || this.constructor._compile.call(this, el, exp, nodeFn, attrs);\n\
-\n\
-  // executed every time template is rendered.\n\
-  obj.exec = function(scope, el){\n\
-    return fn.call(obj, scope, el, exp, nodeFn, attrs) || scope;\n\
-  }\n\
-\n\
-  return obj.exec;\n\
-};//@ sourceURL=tower-directive/lib/proto.js"
-));
-require.register("tower-template/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var directive = require('tower-directive');\n\
-var content = require('tower-content');\n\
-\n\
-/**\n\
- * Expose `template`.\n\
- */\n\
-\n\
-exports = module.exports = template;\n\
-\n\
-/**\n\
- * Expose `compile`.\n\
- */\n\
-\n\
-exports.compile = compile;\n\
-\n\
-/**\n\
- * Expose `collection`.\n\
- */\n\
-\n\
-exports.collection = {};\n\
-\n\
-/**\n\
- * Expose `document`.\n\
- *\n\
- * For server-side use.\n\
- */\n\
-\n\
-exports.document = 'undefined' == typeof document\n\
-  ? {} // XXX: tower/server-dom\n\
-  : window.document;\n\
-\n\
-/**\n\
- * Client-side reactive templates (just plain DOM node manipulation, no strings).\n\
- *\n\
- * @module template\n\
- *\n\
- * @param {String} name The template's name.\n\
- * @param {HTMLNode} node The HTML node.\n\
- * @return {Function} The compiled template function.\n\
- * @api public\n\
- */\n\
-\n\
-function template(name, node) {\n\
-  if ('function' === typeof node)\n\
-    return exports.collection[name] = node;\n\
-\n\
-  // if `name` is a DOM node, arguments are shifted by 1\n\
-  if ('string' !== typeof name) return compile(name);\n\
-  // only 1 argument\n\
-  if (undefined === node) return exports.collection[name];\n\
-  // compile it\n\
-  return exports.collection[name] = compile(node);\n\
-}\n\
-\n\
-/**\n\
- * Check if template with `name` exists.\n\
- *\n\
- * @api public\n\
- */\n\
-\n\
-exports.defined = function(name){\n\
-  return !!exports.collection.hasOwnProperty(name);\n\
-};\n\
-\n\
-/**\n\
- * Traverse `node` and children recursively,\n\
- * and collect and execute directives.\n\
- *\n\
- * @param {HTMLNode} node\n\
- * @param {Array} start Directives to start.\n\
- * @return {Function} The compiled template function.\n\
- */\n\
-\n\
-function compile(node, start) {\n\
-  // http://stackoverflow.com/questions/384286/javascript-isdom-how-do-you-check-if-a-javascript-object-is-a-dom-object\n\
-  // XXX: if node gets replaced here, needs to be reflected\n\
-  // use nodeList[i] in case it gets compiled beneath\n\
-  // XXX: therefore, it must always be on arrays\n\
-  if (node.nodeType) {\n\
-    // find nodeList and index;\n\
-    var nodeList;\n\
-    var index;\n\
-    if (node.parentNode) {\n\
-      nodeList = node.parentNode.childNodes;\n\
-      for (var i = 0; i < nodeList.length; i++) {\n\
-        if (node == nodeList[i]) {\n\
-          index = i;\n\
-          break;\n\
-        }\n\
-      }\n\
-    } else {\n\
-      var frag = document.createDocumentFragment();\n\
-      frag.appendChild(node);\n\
-      nodeList = frag.childNodes;\n\
-      index = 0;\n\
-    }\n\
-  }\n\
-\n\
-  var nodeFn = node.nodeType\n\
-    ? compileNode(node, index, nodeList, start)\n\
-    : compileEach(node);\n\
-\n\
-  function fn(scope, el) {\n\
-    if (!content.is(scope))\n\
-      scope = content('anonymous').init(scope);\n\
-\n\
-    return nodeFn(scope, el);\n\
-  }\n\
-\n\
-  return fn;\n\
-}\n\
-\n\
-// XXX: compileNode(node, nodeList, directiveIndex)\n\
-function compileNode(node, index, nodeList, start) {\n\
-  var directivesFn = compileDirectives(node, nodeFn, start);\n\
-  var terminal = directivesFn && directivesFn.terminal;\n\
-  \n\
-  // recursive\n\
-  var eachFn = !terminal && node.childNodes\n\
-    ? compileEach(node.childNodes)\n\
-    : undefined;\n\
-\n\
-  // `returnNode` is used for recursively \n\
-  // passing children. this is used for cloning, \n\
-  // where it should apply the directives to \n\
-  // the new children, not the original \n\
-  // template's children.\n\
-\n\
-  function nodeFn(scope, returnNode) {\n\
-    returnNode || (returnNode = node);\n\
-\n\
-    // apply directives to node.\n\
-    if (directivesFn) scope = directivesFn(scope, returnNode);\n\
-\n\
-    // recurse, apply directives to children.\n\
-    //if (eachFn && returnNode.childNodes)\n\
-    if (eachFn && returnNode.childNodes)\n\
-      eachFn(scope, returnNode.childNodes, returnNode);\n\
-\n\
-    return returnNode;\n\
-  }\n\
-\n\
-  return nodeFn;\n\
-}\n\
-\n\
-function compileEach(nodeList) {\n\
-  var fns = [];\n\
-  // doesn't cache `length` b/c items can be removed\n\
-  //for (var i = 0, n = children.length; i < n; i++) {\n\
-  for (var i = 0; i < nodeList.length; i++) {\n\
-    fns.push(compileNode(nodeList[i], i, nodeList));\n\
-  }\n\
-\n\
-  return createEachFn(fns);\n\
-}\n\
-\n\
-function compileDirectives(node, nodeFn, start) {\n\
-  var directives = getDirectives(node, start);\n\
-  if (!directives.length) return; // don't execute function if unnecessary.\n\
-\n\
-  var terminal = false;\n\
-  var fns = [];\n\
-  var obj;\n\
-\n\
-  for (var i = start || 0, n = directives.length; i < n; i++) {\n\
-    obj = directives[i];\n\
-\n\
-    // XXX: if obj.element\n\
-    if (obj.template) {\n\
-      var templateEl = obj.templateEl.cloneNode(true);\n\
-      // XXX: replace <content> tags with the stuff from the current `node`.\n\
-\n\
-      if (obj.replace) {\n\
-        node.parentNode.replaceChild(templateEl, node);\n\
-        node = templateEl;\n\
-        directives = directives.concat(getDirectives(node));\n\
-        n = directives.length;\n\
-        terminal = true;\n\
-      } else {\n\
-        node.appendChild(templateEl);\n\
-      }\n\
-    }\n\
-\n\
-    // meta node (such as `data-each` or `data-if`)\n\
-    if (obj.meta) {\n\
-      obj.terminal = true;\n\
-      // you have to replace nodes, not remove them, to keep order.\n\
-      var val = node.getAttribute(obj.name);\n\
-      var comment = exports.document.createComment(' ' + obj.name + ':' + val + ' ');\n\
-      if (node.parentNode)\n\
-        node.parentNode.replaceChild(comment, node);\n\
-      // XXX: should skip already processed directives\n\
-      // <profile data-each=\"user in users\"></profile>\n\
-      // template(el, [ 'profile', 'data-each' ]);\n\
-      nodeFn = compile(node, i + 1);\n\
-      //node = comment;\n\
-    }\n\
-\n\
-    var fn = obj.compile(node, nodeFn);\n\
-    fns.push(fn);\n\
-    terminal = obj.terminal;\n\
-    if (terminal) break;\n\
-  }\n\
-\n\
-  var directivesFn = createDirectivesFn(fns);\n\
-  directivesFn.terminal = terminal;\n\
-  return directivesFn;\n\
-}\n\
-\n\
-function getDirectives(node, start) {\n\
-  var directives = [];\n\
-  var attrs = {};\n\
-\n\
-  // https://developer.mozilla.org/en-US/docs/Web/API/Node.nodeType\n\
-  switch (node.nodeType) {\n\
-    case 1: // element node (visible tags plus <style>, <meta>)\n\
-      // first, appendDirective directive named after node, if it exists.\n\
-      var tag = node.nodeName.toLowerCase();\n\
-      appendDirective(tag, 'element', node, directives, attrs);\n\
-      appendAttributeDirectives(node, directives, attrs, tag);\n\
-      break;\n\
-    case 3: // text node\n\
-      // node.nodeValue\n\
-      appendDirective('interpolation', 'attribute', directives, node, attrs);\n\
-      break;\n\
-    case 8: // comment node\n\
-      break;\n\
-  }\n\
-\n\
-  return directives.length\n\
-    ? directives.sort(priority)\n\
-    : directives;\n\
-}\n\
-\n\
-function appendAttributeDirectives(node, directives, attrs, tag) {\n\
-  var attr;\n\
-  for (var i = 0, n = node.attributes.length; i < n; i++) {\n\
-    attr = node.attributes[i];\n\
-    // http://www.w3schools.com/dom/prop_attr_specified.asp\n\
-    if (!attr.specified || attrs[attr.name]) continue;\n\
-    appendDirective(attr.name, 'attribute', node, directives, attrs, tag);\n\
-    // if the expression wasn't added\n\
-    if (!attrs[attr.name]) attrs[attr.name] = attr.value;\n\
-  }\n\
-}\n\
-\n\
-/**\n\
- * Add directive.\n\
- *\n\
- * @param {String} name The directive's name.\n\
- * @param {Array} directives The list of directives.\n\
- */\n\
-\n\
-function appendDirective(name, type, node, directives, attrs, tag) {\n\
-  var Directive = directive.collection[name];\n\
-  if (Directive && Directive.prototype[type]) {\n\
-    if (!tag || !Directive.tag || (tag === Directive.tag)) {\n\
-      directives.push(new Directive(node, attrs)); \n\
-    }\n\
-  }\n\
-}\n\
-\n\
-/**\n\
- * Creates a template function for node children\n\
- * in an isolated JS scope.\n\
- */\n\
-\n\
-function createEachFn(fns) {\n\
-  var n = fns.length, i;\n\
-\n\
-  function eachFn(scope, children, returnNode) {\n\
-    var current = [];\n\
-    for (i = 0; i < n; i++) {\n\
-      current.push(children[i]);\n\
-    }\n\
-\n\
-    for (i = 0; i < n; i++) {\n\
-      // XXX: not sure this is correct.\n\
-      // XXX: should pass in `children` and `i` instead,\n\
-      //      in case something is replaced\n\
-      // if (current[i] !== children[i]) XXX: search for it, so we know the index\n\
-      fns[i](scope, current[i]);\n\
-    }\n\
-  }\n\
-\n\
-  return eachFn;\n\
-}\n\
-\n\
-/**\n\
- * Creates a template function for node directives\n\
- * in an isolated JS scope.\n\
- *\n\
- * @param {Array} fns Array of directive functions.\n\
- * @return {Function} A template function for node directives.\n\
- */\n\
-\n\
-function createDirectivesFn(fns) {\n\
-  var n = fns.length, i;\n\
-\n\
-  function directivesFn(scope, node, childNodes, i) {\n\
-    // if we've moved this node around, then\n\
-    // it should still have access to the original scope.\n\
-    if (node.__scope__)\n\
-      scope = node.__scope__;\n\
-    \n\
-    for (i = 0; i < n; i++) {\n\
-      // XXX: instead of `node`, do something like `childNodes[i]`\n\
-      scope = fns[i](scope, node);\n\
-    }\n\
-\n\
-    return scope;\n\
-  }\n\
-\n\
-  return directivesFn;\n\
-}\n\
-\n\
-/**\n\
- * Sort by priority.\n\
- */\n\
-\n\
-function priority(a, b) {\n\
-  return b.priority - a.priority;\n\
-}//@ sourceURL=tower-template/index.js"
-));
-require.register("tower-oid/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Check if we need to do an IE hack.\n\
- *\n\
- * If we need to do an IE hack, see if we\n\
- * really can by seeing if we can override `toLocaleString`.\n\
- *\n\
- * @see http://stackoverflow.com/questions/3705383/ie8-bug-in-for-in-javascript-statement\n\
- * @see http://stackoverflow.com/questions/17934888/how-to-add-non-enumerable-property-in-javascript-for-ie8/17935125#17935125\n\
- */\n\
-\n\
-var bug = false;\n\
-\n\
-try {\n\
-  bug = !({ toLocaleString: 3 }.propertyIsEnumerable('toLocaleString'));\n\
-} catch (e) {}\n\
-\n\
-/**\n\
- * get/set id.\n\
- */\n\
-\n\
-if (bug) {\n\
-  var get = function get(obj){\n\
-    return primitive(obj) || ('function' === typeof obj.toLocaleString\n\
-      ? set(obj)\n\
-      : obj.toLocaleString);\n\
-  };\n\
-\n\
-  var set = function set(obj){\n\
-    return obj.toLocaleString = get.id++;\n\
-  };\n\
-} else {\n\
-  var get = function get(obj){\n\
-    return (obj && obj.__id__) || primitive(obj) || set(obj);\n\
-  };\n\
-\n\
-  var set = function set(obj){\n\
-    return Object.defineProperty(obj, '__id__', { enumerable: false, value: get.id++ }) && obj.__id__;\n\
-  };\n\
-}\n\
-\n\
-function primitive(obj) {\n\
-  if (undefined === obj) return 'undefined';\n\
-  if (null === obj) return 'null';\n\
-\n\
-  switch(typeof obj) {\n\
-    case 'number':\n\
-    case 'string':\n\
-    case 'boolean':\n\
-      return String(obj);\n\
-  }\n\
-}\n\
-\n\
-/**\n\
- * Incremented `id`.\n\
- */\n\
-\n\
-get.id = 1;\n\
-\n\
-/**\n\
- * Expose `get`.\n\
- */\n\
-\n\
-module.exports = get;//@ sourceURL=tower-oid/index.js"
-));
-require.register("tower-accessor/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var Emitter = require('tower-emitter');\n\
-var oid = require('tower-oid');\n\
-\n\
-/**\n\
- * Expose `accessor`.\n\
- */\n\
-\n\
-exports = module.exports = accessor;\n\
-\n\
-/**\n\
- * Expose `Accessor`.\n\
- */\n\
-\n\
-exports.Accessor = Accessor;\n\
-\n\
-/**\n\
- * Map of accessors to object + property.\n\
- */\n\
-\n\
-exports.collection = {};\n\
-\n\
-/**\n\
- * Get a new `Accessor`.\n\
- *\n\
- * @param {Object} obj Object where property is defined.\n\
- * @param {String} path Path to property.\n\
- * @api public\n\
- */\n\
-\n\
-function accessor(obj, path) {\n\
-  if (!path) {\n\
-    var id = oid(obj);\n\
-    var attrs = exports.collection[id] || (exports.collection[id] = {});\n\
-    var name = 'undefined';\n\
-    if (attrs[name]) {\n\
-      obj = attrs[name];\n\
-    } else {\n\
-      obj = new Accessor(obj);\n\
-      attrs[name] = obj;\n\
-    }\n\
-    return obj;\n\
-  }\n\
-\n\
-  var parts = path.split('.');\n\
-\n\
-  // XXX: super messy, but works.\n\
-  while (parts.length) {\n\
-    var name = parts.shift();\n\
-    if (obj instanceof Accessor) {\n\
-      var id = oid(obj.get());\n\
-      var attrs = exports.collection[id] || (exports.collection[id] = {});\n\
-      if (attrs[name]) {\n\
-        obj = attrs[name];\n\
-      } else {\n\
-        obj = obj.child(name);\n\
-        attrs[name] = obj;\n\
-      }\n\
-    } else {\n\
-      var id = oid(obj);\n\
-      var attrs = exports.collection[id] || (exports.collection[id] = {});\n\
-      if (attrs[name]) {\n\
-        obj = attrs[name];\n\
-      } else {\n\
-        obj = new Accessor(obj, name);\n\
-        attrs[name] = obj;\n\
-      }\n\
-    }\n\
-  }\n\
-\n\
-  return obj;\n\
-}\n\
-\n\
-/**\n\
- * Instantiate a new `Accessor`.\n\
- */\n\
-\n\
-function Accessor(obj, name) {\n\
-  this.obj = obj;\n\
-  this.name = name;\n\
-}\n\
-\n\
-/**\n\
- * Mixin `Emitter`.\n\
- */\n\
-\n\
-Emitter(Accessor.prototype);\n\
-\n\
-/**\n\
- * Get property.\n\
- */\n\
-\n\
-Accessor.prototype.get = function(){\n\
-  return this.name ? this.obj[this.name] : this.obj;\n\
-};\n\
-\n\
-/**\n\
- * Set property.\n\
- *\n\
- * @param {Mixed} val\n\
- * @return val\n\
- */\n\
-\n\
-Accessor.prototype.set = function(val){\n\
-  var prev = this.get();\n\
-  if (prev === val) return val;\n\
-  this.obj[this.name] = val;\n\
-  if (this.children) {\n\
-    for (var name in this.children) {\n\
-      if (this.children.hasOwnProperty(name))\n\
-        this.children[name].replace(val);\n\
-    }\n\
-  }\n\
-  \n\
-  this.emit('change', val, prev, this.obj);\n\
-  return val;\n\
-};\n\
-\n\
-/**\n\
- * Replace property object with new object.\n\
- *\n\
- * @param {Mixed} obj\n\
- */\n\
-\n\
-Accessor.prototype.replace = function(obj){\n\
-  this.obj = obj;\n\
-  var val = this.get();\n\
-\n\
-  if (this.children) {\n\
-    for (var name in this.children) {\n\
-      if (this.children.hasOwnProperty(name))\n\
-        this.children[name].replace(val);\n\
-    }\n\
-  }\n\
-\n\
-  this.emit('change', val);\n\
-};\n\
-\n\
-/**\n\
- * Child accessor.\n\
- *\n\
- * @param {String} path Property to create child accessor from.\n\
- */\n\
-\n\
-Accessor.prototype.accessor = function(path){\n\
-  return accessor(this, path);\n\
-};\n\
-\n\
-Accessor.prototype.child = function(name){\n\
-  this.children || (this.children = {});\n\
-  return this.children[name] || (this.children[name] = accessor(this.get(), name));\n\
-};//@ sourceURL=tower-accessor/index.js"
-));
-require.register("tower-content/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var Emitter = require('tower-emitter');\n\
-var accessor = require('tower-accessor');\n\
-var proto = require('./lib/proto');\n\
-var statics = require('./lib/statics');\n\
-var root;\n\
-\n\
-/**\n\
- * Expose `content`.\n\
- */\n\
-\n\
-exports = module.exports = content;\n\
-\n\
-/**\n\
- * Expose `collection`.\n\
- */\n\
-\n\
-exports.collection = [];\n\
-\n\
-/**\n\
- * Public API. Gets an existing content or creates a new one.\n\
- *\n\
- * @param {String} name The content's name.\n\
- * @param {Function} fn Function called on content initialization.\n\
- * @return {Content} A `Content` object.\n\
- * @api public\n\
- */\n\
-\n\
-function content(name, fn) {\n\
-  if (exports.collection[name]) return exports.collection[name];\n\
-\n\
-  /**\n\
-   * Class representing a specific data segment in the DOM.\n\
-   *\n\
-   * @class\n\
-   *\n\
-   * @param {Object} data The content's data.\n\
-   * @api public\n\
-   */\n\
-\n\
-  function Content(data, parent) {\n\
-    this.name = name;\n\
-    // all actual attributes/values\n\
-    this.data = {};\n\
-    this.edges = {};\n\
-    this.children = [];\n\
-    this.root = 'root' === name ? this : exports.root();\n\
-    this.setParent(parent);\n\
-    this.accessor = accessor(this, 'data');\n\
-    data = Content._defaultAttrs(data, this);\n\
-    if (data) this.update(data);\n\
-    // for being able to emit events to instances from class.\n\
-    Content.instances.push(this);\n\
-    Content.emit('init', this);\n\
-  }\n\
-\n\
-  Content.prototype = {};\n\
-  Content.prototype.constructor = Content;\n\
-  Content.id = name;\n\
-  Content.attrs = [];\n\
-  Content.attrs.__default__ = {};\n\
-  Content.methods = {};\n\
-  Content.instances = [];\n\
-  Content.accessor = accessor(Content);\n\
-\n\
-  // statics\n\
-\n\
-  for (var key in statics) Content[key] = statics[key];\n\
-\n\
-  // proto\n\
-\n\
-  for (var key in proto) Content.prototype[key] = proto[key];\n\
-\n\
-  /**\n\
-   * Standard `toString`.\n\
-   *\n\
-   * @constructor Content\n\
-   * @see http://perfectionkills.com/instanceof-considered-harmful-or-how-to-write-a-robust-isarray/\n\
-   * @return {String} A specifically formatted String.\n\
-   * @api public\n\
-   */\n\
-\n\
-  Content.prototype.toString = function(){\n\
-    return '[object Content]';\n\
-  };\n\
-\n\
-  if (fn) Content.on('init', fn);\n\
-\n\
-  exports.collection.push(Content);\n\
-  exports.collection[name] = Content;\n\
-  exports.emit('define', Content);\n\
-  return Content;\n\
-}\n\
-\n\
-// XXX: not sure where this should go yet.\n\
-proto.serialize = function(){\n\
-  var json = {};\n\
-  var data = this.data;\n\
-  for (var key in data) {\n\
-    if (content.is(data[key])) {\n\
-      json[key] = data[key].serialize();\n\
-    } else if (this.constructor.attrs[key]) {\n\
-      json[key] = data[key];\n\
-    }\n\
-  }\n\
-  return json;\n\
-};\n\
-\n\
-/**\n\
- * Define a nested scope.\n\
- */\n\
-\n\
-statics.scope = function(name){\n\
-  // only define once.\n\
-  var childName = this.id + '.' + name;\n\
-  if (content.defined(childName))\n\
-    return content(childName);\n\
-\n\
-  var scope = content(childName);\n\
-  scope._parent = this;\n\
-  scope.scopeName = name;\n\
-  \n\
-  this.attr(name, 'object', function(parent, val){\n\
-    var obj = scope.init(val, parent);\n\
-    // XXX: tmp hack!\n\
-    obj.data.name = name;\n\
-    return obj.data;\n\
-  });\n\
-\n\
-  return scope;\n\
-};\n\
-\n\
-/**\n\
- * Mixin `Emitter`.\n\
- */\n\
-\n\
-Emitter(exports);\n\
-Emitter(proto);\n\
-Emitter(statics);\n\
-\n\
-/**\n\
- * Clear the collections.\n\
- * Used for testing.\n\
- *\n\
- * @chainable\n\
- * @return {Function} exports The main `content` function.\n\
- * @api public\n\
- */\n\
-\n\
-exports.clear = function(){\n\
-  exports.off();\n\
-  exports.root().remove();\n\
-  exports.collection = [];\n\
-  root = undefined;\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Check if a content has been defined.\n\
- *\n\
- * @param {String} name The content's name.\n\
- * @return {Boolean} true if the `Content` has been defined, but false otherwise.\n\
- * @api public\n\
- */\n\
-\n\
-exports.defined = function(name){\n\
-  return exports.collection.hasOwnProperty(name);\n\
-};\n\
-\n\
-/**\n\
- * Check if `obj` is a `Content` object\n\
- *\n\
- * @param {Content} obj A content object.\n\
- * @return {Boolean} true if `obj` is a Content object, but false otherwise.\n\
- * @api public\n\
- */\n\
-\n\
-exports.is = function(obj){\n\
-  return obj && '[object Content]' === obj.toString();\n\
-};\n\
-\n\
-/**\n\
- * Get the initiated root content.\n\
- *\n\
- * @return {Content} The root content.\n\
- * @api public\n\
- */\n\
-\n\
-exports.root = function(){\n\
-  if (root) return root;\n\
-  return root = content('root').init();\n\
-};//@ sourceURL=tower-content/index.js"
-));
-require.register("tower-content/lib/proto.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var accessor = require('tower-accessor');\n\
-var indexOf = require('indexof');\n\
-var slice = [].slice;\n\
-\n\
-/**\n\
- * Get attr.\n\
- *\n\
- * Attributes can be functions.\n\
- * However, an `action` can not be called through `get`.\n\
- *\n\
- * @constructor Content\n\
- * @param {String} str A path delimited by periods `.`.\n\
- * @return {Mixed} An attribute.\n\
- * @api public\n\
- */\n\
-\n\
-exports.get = function(str){\n\
-  return this.edge(str).get();\n\
-};\n\
-\n\
-/**\n\
- * Set attr.\n\
- *\n\
- * @constructor Content\n\
- * @param {String} name The attribute's name.\n\
- * @param {Mixed} val The attribute's value.\n\
- * @return {Object} The attribute's value.\n\
- * @api public\n\
- */\n\
-\n\
-exports.set = function(name, val){\n\
-  return this.edge(name).set(val);\n\
-};\n\
-\n\
-/**\n\
- * Create an edge to an property in the scope tree.\n\
- *\n\
- * @api private\n\
- */\n\
-\n\
-exports.edge = function(str){\n\
-  if (this.edges[str]) return this.edges[str];\n\
-\n\
-  var path = str.split('.');\n\
-  var name = path.shift();\n\
-\n\
-  if (this.data.hasOwnProperty(name)) {\n\
-    return this.edges[str] = this.accessor.accessor(str);\n\
-  }\n\
-\n\
-  // XXX: need to clean this up\n\
-  if (name === 'constructor') {\n\
-    return this.edges[str] = this.constructor.accessor.accessor(path.join('.'));\n\
-  }\n\
-\n\
-  // XXX: this should be refactored too\n\
-  if (this.constructor.attrs.hasOwnProperty(name)) {\n\
-    this.data[name] = undefined;\n\
-    return this.edges[str] = this.accessor.accessor(str);\n\
-  }\n\
-\n\
-  if (this.parent) {\n\
-    return this.edges[str] = this.parent.edge(str);\n\
-  }\n\
-\n\
-  console.log(this.parent)\n\
-\n\
-  return {\n\
-    get: function(){},\n\
-    set: function(){}\n\
-  };\n\
-  //error(this.constructor.id, 'attr', name);\n\
-};\n\
-\n\
-exports.attr = function(path){\n\
-  if (this.edges[path]) return this.edges[path];\n\
-  return this.edges[path] = this.accessor.accessor(path);\n\
-};\n\
-\n\
-/**\n\
- * Traverse content tree to find action `fn`.\n\
- *\n\
- * @param {Content} content The starting content.\n\
- * @param {String} name The action's name.\n\
- * @return {Function} The named action.\n\
- */\n\
-\n\
-exports.method = function(name){\n\
-  if (this.constructor.methods[name])\n\
-    return this.constructor.methods[name];\n\
-  if (this.parent)\n\
-    return this.parent.method(name);\n\
-\n\
-  error(this.constructor.id, 'method', name);\n\
-};\n\
-\n\
-/**\n\
- * Update attribute value.\n\
- *\n\
- * @constructor Content\n\
- * @chainable\n\
- * @param {Object} data The new attribute value.\n\
- * @return {Function} exports The main `content` function.\n\
- * @api public\n\
- */\n\
-\n\
-exports.update = function(data){\n\
-  this.data = data;\n\
-  //for (var key in data) {\n\
-  //  this.set(key, data[key]);\n\
-  //}\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Notify self and all children of event.\n\
- *\n\
- * @param {String} name The attribute's name.\n\
- * @api public\n\
- */\n\
-\n\
-exports.broadcast = function(){\n\
-  this.emit.apply(this, arguments);\n\
-\n\
-  if (!this.children.length) return this;\n\
-\n\
-  for (var i = 0, n = this.children.length; i < n; i++)\n\
-    this.children[i].broadcast.apply(this.children[i], arguments);\n\
-\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Apply an action.\n\
- *\n\
- * @constructor Content\n\
- * @param {String} name The action's name.\n\
- * @param {Array} args The action's list of parameters.\n\
- * @return {Function} The named action.\n\
- * @api public\n\
- */\n\
-\n\
-exports.apply = function(name, args){\n\
-  return this.method(name).apply(this, args);\n\
-};\n\
-\n\
-/**\n\
- * Call an action.\n\
- *\n\
- * @constructor Content\n\
- * @param {String} name The action's name.\n\
- * @return {Function} The named action.\n\
- * @api public\n\
- */\n\
-\n\
-exports.call = function(name){\n\
-  return this.method(name).apply(this, slice.call(arguments, 1));\n\
-};\n\
-\n\
-/**\n\
- * Emit `'remove'` event for directives\n\
- * to teardown custom functionality for their element.\n\
- *\n\
- * @constructor Content\n\
- * @chainable\n\
- * @return {Function} exports The main `content` function.\n\
- * @api public\n\
- */\n\
-\n\
-exports.remove = function(){\n\
-  for (var i = 0, n = this.children.length; i < n; i++) {\n\
-    this.children[i].remove();\n\
-  }\n\
-  this.emit('remove');\n\
-  // XXX: not sure this is necessary\n\
-  this.constructor.emit('remove', this);\n\
-\n\
-  var i = indexOf(this.constructor.instances, this);\n\
-  if (i >= 0) this.constructor.instances.splice(i, 1);\n\
-\n\
-  this.root = undefined;\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Standard `toString`.\n\
- *\n\
- * @constructor Content\n\
- * @see http://perfectionkills.com/instanceof-considered-harmful-or-how-to-write-a-robust-isarray/\n\
- * @return {String} A specifically formatted String.\n\
- * @api public\n\
- */\n\
-\n\
-exports.toString = function(){\n\
-  return '[object Content]';\n\
-};\n\
-\n\
-/**\n\
- * Properly set the parent content.\n\
- *\n\
- * @api private\n\
- */\n\
-\n\
-exports.setParent = function(parent){\n\
-  if (!parent && 'root' !== this.name)\n\
-    this.parent = this.root;\n\
-  else\n\
-    this.parent = parent;\n\
-\n\
-  if (this.parent) {\n\
-    this.parent.children.push(this);\n\
-    this.parent.children[this.constructor.scopeName] = this;\n\
-  }\n\
-};\n\
-\n\
-/**\n\
- * Get nested scope if exists.\n\
- */\n\
-\n\
-exports.scope = function(name){\n\
-  return this.children[name];\n\
-};\n\
-\n\
-function error(id, type, name) {\n\
-  throw new Error(\"content('\" + id + \"') \" + type + \" [\" + name + \"] not found.\");\n\
-}\n\
-//@ sourceURL=tower-content/lib/proto.js"
-));
-require.register("tower-content/lib/statics.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var attr = require('tower-attr');\n\
-\n\
-/**\n\
- * Instantiate a new `Content`.\n\
- *\n\
- * @constructor Content\n\
- * @param {Object} data The content's data to proxy.\n\
- * @param {Parent} [parent] Parent content (defaults to the root content scope).\n\
- * @return {Content} self\n\
- * @api public\n\
- */\n\
-\n\
-exports.init = function(data, parent){\n\
-  return new this(data, parent);\n\
-};\n\
-\n\
-/**\n\
- * Go up the scope chain to the parent-defining scope.\n\
- */\n\
-\n\
-exports.parent = function(){\n\
-  return this._parent || this;\n\
-};\n\
-\n\
-/**\n\
- * Define attr with the given `name` and `options`.\n\
- *\n\
- * @constructor Content\n\
- * @chainable\n\
- * @param {String} name\n\
- * @param {Object} options\n\
- * @return {Function} exports The main `content` function.\n\
- * @api public\n\
- */\n\
-\n\
-exports.attr = function(name, type, options){\n\
-  var obj = this.context = attr(name, type, options, this.id + '.' + name);\n\
-  this.attrs[name] = obj;\n\
-  this.attrs.push(obj);\n\
-  if (undefined !== obj.value) this.attrs.__default__[name] = obj;\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Define a method.\n\
- *\n\
- * @constructor Content\n\
- * @chainable\n\
- * @param {String} name The action's name.\n\
- * @param {Function} fn The action's function definition.\n\
- * @return {Function} exports The main `content` function.\n\
- * @api public\n\
- */\n\
-\n\
-exports.method = function(name, fn){\n\
-  this.methods[name] = fn;\n\
-  return this;\n\
-};\n\
-\n\
-/**\n\
- * Define an action.\n\
- */\n\
-\n\
-exports.action = exports.method;\n\
-\n\
-/**\n\
- * Define a helper.\n\
- *\n\
- * This exists purely to make code easier to separate/distinguish.\n\
- */\n\
-\n\
-exports.helper = exports.method;\n\
-\n\
-/**\n\
- * Returns the default model attributes with their values.\n\
- *\n\
- * @constructor Content\n\
- * @return {Object} The default model attributes with their values.\n\
- * @api private\n\
- */\n\
-\n\
-exports._defaultAttrs = function(attrs, binding){\n\
-  // XXX: this can be optimized further.\n\
-  var defaultAttrs = this.attrs.__default__;\n\
-  attrs || (attrs = {});\n\
-  for (var name in defaultAttrs) {\n\
-    if (null == attrs[name] || 'function' === defaultAttrs[name].valueType) {\n\
-      attrs[name] = defaultAttrs[name].apply(binding, attrs[name]);\n\
-    }\n\
-  }\n\
-  return attrs;\n\
-};//@ sourceURL=tower-content/lib/statics.js"
-));
-require.register("ftlabs-fastclick/lib/fastclick.js", Function("exports, require, module",
-"/**\n\
- * @preserve FastClick: polyfill to remove click delays on browsers with touch UIs.\n\
- *\n\
- * @version 0.6.11\n\
- * @codingstandard ftlabs-jsv2\n\
- * @copyright The Financial Times Limited [All Rights Reserved]\n\
- * @license MIT License (see LICENSE.txt)\n\
- */\n\
-\n\
-/*jslint browser:true, node:true*/\n\
-/*global define, Event, Node*/\n\
-\n\
-\n\
-/**\n\
- * Instantiate fast-clicking listeners on the specificed layer.\n\
- *\n\
- * @constructor\n\
- * @param {Element} layer The layer to listen on\n\
- */\n\
-function FastClick(layer) {\n\
-\t'use strict';\n\
-\tvar oldOnClick, self = this;\n\
-\n\
-\n\
-\t/**\n\
-\t * Whether a click is currently being tracked.\n\
-\t *\n\
-\t * @type boolean\n\
-\t */\n\
-\tthis.trackingClick = false;\n\
-\n\
-\n\
-\t/**\n\
-\t * Timestamp for when when click tracking started.\n\
-\t *\n\
-\t * @type number\n\
-\t */\n\
-\tthis.trackingClickStart = 0;\n\
-\n\
-\n\
-\t/**\n\
-\t * The element being tracked for a click.\n\
-\t *\n\
-\t * @type EventTarget\n\
-\t */\n\
-\tthis.targetElement = null;\n\
-\n\
-\n\
-\t/**\n\
-\t * X-coordinate of touch start event.\n\
-\t *\n\
-\t * @type number\n\
-\t */\n\
-\tthis.touchStartX = 0;\n\
-\n\
-\n\
-\t/**\n\
-\t * Y-coordinate of touch start event.\n\
-\t *\n\
-\t * @type number\n\
-\t */\n\
-\tthis.touchStartY = 0;\n\
-\n\
-\n\
-\t/**\n\
-\t * ID of the last touch, retrieved from Touch.identifier.\n\
-\t *\n\
-\t * @type number\n\
-\t */\n\
-\tthis.lastTouchIdentifier = 0;\n\
-\n\
-\n\
-\t/**\n\
-\t * Touchmove boundary, beyond which a click will be cancelled.\n\
-\t *\n\
-\t * @type number\n\
-\t */\n\
-\tthis.touchBoundary = 10;\n\
-\n\
-\n\
-\t/**\n\
-\t * The FastClick layer.\n\
-\t *\n\
-\t * @type Element\n\
-\t */\n\
-\tthis.layer = layer;\n\
-\n\
-\tif (!layer || !layer.nodeType) {\n\
-\t\tthrow new TypeError('Layer must be a document node');\n\
-\t}\n\
-\n\
-\t/** @type function() */\n\
-\tthis.onClick = function() { return FastClick.prototype.onClick.apply(self, arguments); };\n\
-\n\
-\t/** @type function() */\n\
-\tthis.onMouse = function() { return FastClick.prototype.onMouse.apply(self, arguments); };\n\
-\n\
-\t/** @type function() */\n\
-\tthis.onTouchStart = function() { return FastClick.prototype.onTouchStart.apply(self, arguments); };\n\
-\n\
-\t/** @type function() */\n\
-\tthis.onTouchMove = function() { return FastClick.prototype.onTouchMove.apply(self, arguments); };\n\
-\n\
-\t/** @type function() */\n\
-\tthis.onTouchEnd = function() { return FastClick.prototype.onTouchEnd.apply(self, arguments); };\n\
-\n\
-\t/** @type function() */\n\
-\tthis.onTouchCancel = function() { return FastClick.prototype.onTouchCancel.apply(self, arguments); };\n\
-\n\
-\tif (FastClick.notNeeded(layer)) {\n\
-\t\treturn;\n\
-\t}\n\
-\n\
-\t// Set up event handlers as required\n\
-\tif (this.deviceIsAndroid) {\n\
-\t\tlayer.addEventListener('mouseover', this.onMouse, true);\n\
-\t\tlayer.addEventListener('mousedown', this.onMouse, true);\n\
-\t\tlayer.addEventListener('mouseup', this.onMouse, true);\n\
-\t}\n\
-\n\
-\tlayer.addEventListener('click', this.onClick, true);\n\
-\tlayer.addEventListener('touchstart', this.onTouchStart, false);\n\
-\tlayer.addEventListener('touchmove', this.onTouchMove, false);\n\
-\tlayer.addEventListener('touchend', this.onTouchEnd, false);\n\
-\tlayer.addEventListener('touchcancel', this.onTouchCancel, false);\n\
-\n\
-\t// Hack is required for browsers that don't support Event#stopImmediatePropagation (e.g. Android 2)\n\
-\t// which is how FastClick normally stops click events bubbling to callbacks registered on the FastClick\n\
-\t// layer when they are cancelled.\n\
-\tif (!Event.prototype.stopImmediatePropagation) {\n\
-\t\tlayer.removeEventListener = function(type, callback, capture) {\n\
-\t\t\tvar rmv = Node.prototype.removeEventListener;\n\
-\t\t\tif (type === 'click') {\n\
-\t\t\t\trmv.call(layer, type, callback.hijacked || callback, capture);\n\
-\t\t\t} else {\n\
-\t\t\t\trmv.call(layer, type, callback, capture);\n\
-\t\t\t}\n\
-\t\t};\n\
-\n\
-\t\tlayer.addEventListener = function(type, callback, capture) {\n\
-\t\t\tvar adv = Node.prototype.addEventListener;\n\
-\t\t\tif (type === 'click') {\n\
-\t\t\t\tadv.call(layer, type, callback.hijacked || (callback.hijacked = function(event) {\n\
-\t\t\t\t\tif (!event.propagationStopped) {\n\
-\t\t\t\t\t\tcallback(event);\n\
-\t\t\t\t\t}\n\
-\t\t\t\t}), capture);\n\
-\t\t\t} else {\n\
-\t\t\t\tadv.call(layer, type, callback, capture);\n\
-\t\t\t}\n\
-\t\t};\n\
-\t}\n\
-\n\
-\t// If a handler is already declared in the element's onclick attribute, it will be fired before\n\
-\t// FastClick's onClick handler. Fix this by pulling out the user-defined handler function and\n\
-\t// adding it as listener.\n\
-\tif (typeof layer.onclick === 'function') {\n\
-\n\
-\t\t// Android browser on at least 3.2 requires a new reference to the function in layer.onclick\n\
-\t\t// - the old one won't work if passed to addEventListener directly.\n\
-\t\toldOnClick = layer.onclick;\n\
-\t\tlayer.addEventListener('click', function(event) {\n\
-\t\t\toldOnClick(event);\n\
-\t\t}, false);\n\
-\t\tlayer.onclick = null;\n\
-\t}\n\
-}\n\
-\n\
-\n\
-/**\n\
- * Android requires exceptions.\n\
- *\n\
- * @type boolean\n\
- */\n\
-FastClick.prototype.deviceIsAndroid = navigator.userAgent.indexOf('Android') > 0;\n\
-\n\
-\n\
-/**\n\
- * iOS requires exceptions.\n\
- *\n\
- * @type boolean\n\
- */\n\
-FastClick.prototype.deviceIsIOS = /iP(ad|hone|od)/.test(navigator.userAgent);\n\
-\n\
-\n\
-/**\n\
- * iOS 4 requires an exception for select elements.\n\
- *\n\
- * @type boolean\n\
- */\n\
-FastClick.prototype.deviceIsIOS4 = FastClick.prototype.deviceIsIOS && (/OS 4_\\d(_\\d)?/).test(navigator.userAgent);\n\
-\n\
-\n\
-/**\n\
- * iOS 6.0(+?) requires the target element to be manually derived\n\
- *\n\
- * @type boolean\n\
- */\n\
-FastClick.prototype.deviceIsIOSWithBadTarget = FastClick.prototype.deviceIsIOS && (/OS ([6-9]|\\d{2})_\\d/).test(navigator.userAgent);\n\
-\n\
-\n\
-/**\n\
- * Determine whether a given element requires a native click.\n\
- *\n\
- * @param {EventTarget|Element} target Target DOM element\n\
- * @returns {boolean} Returns true if the element needs a native click\n\
- */\n\
-FastClick.prototype.needsClick = function(target) {\n\
-\t'use strict';\n\
-\tswitch (target.nodeName.toLowerCase()) {\n\
-\n\
-\t// Don't send a synthetic click to disabled inputs (issue #62)\n\
-\tcase 'button':\n\
-\tcase 'select':\n\
-\tcase 'textarea':\n\
-\t\tif (target.disabled) {\n\
-\t\t\treturn true;\n\
-\t\t}\n\
-\n\
-\t\tbreak;\n\
-\tcase 'input':\n\
-\n\
-\t\t// File inputs need real clicks on iOS 6 due to a browser bug (issue #68)\n\
-\t\tif ((this.deviceIsIOS && target.type === 'file') || target.disabled) {\n\
-\t\t\treturn true;\n\
-\t\t}\n\
-\n\
-\t\tbreak;\n\
-\tcase 'label':\n\
-\tcase 'video':\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\treturn (/\\bneedsclick\\b/).test(target.className);\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Determine whether a given element requires a call to focus to simulate click into element.\n\
- *\n\
- * @param {EventTarget|Element} target Target DOM element\n\
- * @returns {boolean} Returns true if the element requires a call to focus to simulate native click.\n\
- */\n\
-FastClick.prototype.needsFocus = function(target) {\n\
-\t'use strict';\n\
-\tswitch (target.nodeName.toLowerCase()) {\n\
-\tcase 'textarea':\n\
-\t\treturn true;\n\
-\tcase 'select':\n\
-\t\treturn !this.deviceIsAndroid;\n\
-\tcase 'input':\n\
-\t\tswitch (target.type) {\n\
-\t\tcase 'button':\n\
-\t\tcase 'checkbox':\n\
-\t\tcase 'file':\n\
-\t\tcase 'image':\n\
-\t\tcase 'radio':\n\
-\t\tcase 'submit':\n\
-\t\t\treturn false;\n\
-\t\t}\n\
-\n\
-\t\t// No point in attempting to focus disabled inputs\n\
-\t\treturn !target.disabled && !target.readOnly;\n\
-\tdefault:\n\
-\t\treturn (/\\bneedsfocus\\b/).test(target.className);\n\
-\t}\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Send a click event to the specified element.\n\
- *\n\
- * @param {EventTarget|Element} targetElement\n\
- * @param {Event} event\n\
- */\n\
-FastClick.prototype.sendClick = function(targetElement, event) {\n\
-\t'use strict';\n\
-\tvar clickEvent, touch;\n\
-\n\
-\t// On some Android devices activeElement needs to be blurred otherwise the synthetic click will have no effect (#24)\n\
-\tif (document.activeElement && document.activeElement !== targetElement) {\n\
-\t\tdocument.activeElement.blur();\n\
-\t}\n\
-\n\
-\ttouch = event.changedTouches[0];\n\
-\n\
-\t// Synthesise a click event, with an extra attribute so it can be tracked\n\
-\tclickEvent = document.createEvent('MouseEvents');\n\
-\tclickEvent.initMouseEvent(this.determineEventType(targetElement), true, true, window, 1, touch.screenX, touch.screenY, touch.clientX, touch.clientY, false, false, false, false, 0, null);\n\
-\tclickEvent.forwardedTouchEvent = true;\n\
-\ttargetElement.dispatchEvent(clickEvent);\n\
-};\n\
-\n\
-FastClick.prototype.determineEventType = function(targetElement) {\n\
-\t'use strict';\n\
-\n\
-\t//Issue #159: Android Chrome Select Box does not open with a synthetic click event\n\
-\tif (this.deviceIsAndroid && targetElement.tagName.toLowerCase() === 'select') {\n\
-\t\treturn 'mousedown';\n\
-\t}\n\
-\n\
-\treturn 'click';\n\
-};\n\
-\n\
-\n\
-/**\n\
- * @param {EventTarget|Element} targetElement\n\
- */\n\
-FastClick.prototype.focus = function(targetElement) {\n\
-\t'use strict';\n\
-\tvar length;\n\
-\n\
-\t// Issue #160: on iOS 7, some input elements (e.g. date datetime) throw a vague TypeError on setSelectionRange. These elements don't have an integer value for the selectionStart and selectionEnd properties, but unfortunately that can't be used for detection because accessing the properties also throws a TypeError. Just check the type instead. Filed as Apple bug #15122724.\n\
-\tif (this.deviceIsIOS && targetElement.setSelectionRange && targetElement.type.indexOf('date') !== 0 && targetElement.type !== 'time') {\n\
-\t\tlength = targetElement.value.length;\n\
-\t\ttargetElement.setSelectionRange(length, length);\n\
-\t} else {\n\
-\t\ttargetElement.focus();\n\
-\t}\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Check whether the given target element is a child of a scrollable layer and if so, set a flag on it.\n\
- *\n\
- * @param {EventTarget|Element} targetElement\n\
- */\n\
-FastClick.prototype.updateScrollParent = function(targetElement) {\n\
-\t'use strict';\n\
-\tvar scrollParent, parentElement;\n\
-\n\
-\tscrollParent = targetElement.fastClickScrollParent;\n\
-\n\
-\t// Attempt to discover whether the target element is contained within a scrollable layer. Re-check if the\n\
-\t// target element was moved to another parent.\n\
-\tif (!scrollParent || !scrollParent.contains(targetElement)) {\n\
-\t\tparentElement = targetElement;\n\
-\t\tdo {\n\
-\t\t\tif (parentElement.scrollHeight > parentElement.offsetHeight) {\n\
-\t\t\t\tscrollParent = parentElement;\n\
-\t\t\t\ttargetElement.fastClickScrollParent = parentElement;\n\
-\t\t\t\tbreak;\n\
-\t\t\t}\n\
-\n\
-\t\t\tparentElement = parentElement.parentElement;\n\
-\t\t} while (parentElement);\n\
-\t}\n\
-\n\
-\t// Always update the scroll top tracker if possible.\n\
-\tif (scrollParent) {\n\
-\t\tscrollParent.fastClickLastScrollTop = scrollParent.scrollTop;\n\
-\t}\n\
-};\n\
-\n\
-\n\
-/**\n\
- * @param {EventTarget} targetElement\n\
- * @returns {Element|EventTarget}\n\
- */\n\
-FastClick.prototype.getTargetElementFromEventTarget = function(eventTarget) {\n\
-\t'use strict';\n\
-\n\
-\t// On some older browsers (notably Safari on iOS 4.1 - see issue #56) the event target may be a text node.\n\
-\tif (eventTarget.nodeType === Node.TEXT_NODE) {\n\
-\t\treturn eventTarget.parentNode;\n\
-\t}\n\
-\n\
-\treturn eventTarget;\n\
-};\n\
-\n\
-\n\
-/**\n\
- * On touch start, record the position and scroll offset.\n\
- *\n\
- * @param {Event} event\n\
- * @returns {boolean}\n\
- */\n\
-FastClick.prototype.onTouchStart = function(event) {\n\
-\t'use strict';\n\
-\tvar targetElement, touch, selection;\n\
-\n\
-\t// Ignore multiple touches, otherwise pinch-to-zoom is prevented if both fingers are on the FastClick element (issue #111).\n\
-\tif (event.targetTouches.length > 1) {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\ttargetElement = this.getTargetElementFromEventTarget(event.target);\n\
-\ttouch = event.targetTouches[0];\n\
-\n\
-\tif (this.deviceIsIOS) {\n\
-\n\
-\t\t// Only trusted events will deselect text on iOS (issue #49)\n\
-\t\tselection = window.getSelection();\n\
-\t\tif (selection.rangeCount && !selection.isCollapsed) {\n\
-\t\t\treturn true;\n\
-\t\t}\n\
-\n\
-\t\tif (!this.deviceIsIOS4) {\n\
-\n\
-\t\t\t// Weird things happen on iOS when an alert or confirm dialog is opened from a click event callback (issue #23):\n\
-\t\t\t// when the user next taps anywhere else on the page, new touchstart and touchend events are dispatched\n\
-\t\t\t// with the same identifier as the touch event that previously triggered the click that triggered the alert.\n\
-\t\t\t// Sadly, there is an issue on iOS 4 that causes some normal touch events to have the same identifier as an\n\
-\t\t\t// immediately preceeding touch event (issue #52), so this fix is unavailable on that platform.\n\
-\t\t\tif (touch.identifier === this.lastTouchIdentifier) {\n\
-\t\t\t\tevent.preventDefault();\n\
-\t\t\t\treturn false;\n\
-\t\t\t}\n\
-\n\
-\t\t\tthis.lastTouchIdentifier = touch.identifier;\n\
-\n\
-\t\t\t// If the target element is a child of a scrollable layer (using -webkit-overflow-scrolling: touch) and:\n\
-\t\t\t// 1) the user does a fling scroll on the scrollable layer\n\
-\t\t\t// 2) the user stops the fling scroll with another tap\n\
-\t\t\t// then the event.target of the last 'touchend' event will be the element that was under the user's finger\n\
-\t\t\t// when the fling scroll was started, causing FastClick to send a click event to that layer - unless a check\n\
-\t\t\t// is made to ensure that a parent layer was not scrolled before sending a synthetic click (issue #42).\n\
-\t\t\tthis.updateScrollParent(targetElement);\n\
-\t\t}\n\
-\t}\n\
-\n\
-\tthis.trackingClick = true;\n\
-\tthis.trackingClickStart = event.timeStamp;\n\
-\tthis.targetElement = targetElement;\n\
-\n\
-\tthis.touchStartX = touch.pageX;\n\
-\tthis.touchStartY = touch.pageY;\n\
-\n\
-\t// Prevent phantom clicks on fast double-tap (issue #36)\n\
-\tif ((event.timeStamp - this.lastClickTime) < 200) {\n\
-\t\tevent.preventDefault();\n\
-\t}\n\
-\n\
-\treturn true;\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Based on a touchmove event object, check whether the touch has moved past a boundary since it started.\n\
- *\n\
- * @param {Event} event\n\
- * @returns {boolean}\n\
- */\n\
-FastClick.prototype.touchHasMoved = function(event) {\n\
-\t'use strict';\n\
-\tvar touch = event.changedTouches[0], boundary = this.touchBoundary;\n\
-\n\
-\tif (Math.abs(touch.pageX - this.touchStartX) > boundary || Math.abs(touch.pageY - this.touchStartY) > boundary) {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\treturn false;\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Update the last position.\n\
- *\n\
- * @param {Event} event\n\
- * @returns {boolean}\n\
- */\n\
-FastClick.prototype.onTouchMove = function(event) {\n\
-\t'use strict';\n\
-\tif (!this.trackingClick) {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\t// If the touch has moved, cancel the click tracking\n\
-\tif (this.targetElement !== this.getTargetElementFromEventTarget(event.target) || this.touchHasMoved(event)) {\n\
-\t\tthis.trackingClick = false;\n\
-\t\tthis.targetElement = null;\n\
-\t}\n\
-\n\
-\treturn true;\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Attempt to find the labelled control for the given label element.\n\
- *\n\
- * @param {EventTarget|HTMLLabelElement} labelElement\n\
- * @returns {Element|null}\n\
- */\n\
-FastClick.prototype.findControl = function(labelElement) {\n\
-\t'use strict';\n\
-\n\
-\t// Fast path for newer browsers supporting the HTML5 control attribute\n\
-\tif (labelElement.control !== undefined) {\n\
-\t\treturn labelElement.control;\n\
-\t}\n\
-\n\
-\t// All browsers under test that support touch events also support the HTML5 htmlFor attribute\n\
-\tif (labelElement.htmlFor) {\n\
-\t\treturn document.getElementById(labelElement.htmlFor);\n\
-\t}\n\
-\n\
-\t// If no for attribute exists, attempt to retrieve the first labellable descendant element\n\
-\t// the list of which is defined here: http://www.w3.org/TR/html5/forms.html#category-label\n\
-\treturn labelElement.querySelector('button, input:not([type=hidden]), keygen, meter, output, progress, select, textarea');\n\
-};\n\
-\n\
-\n\
-/**\n\
- * On touch end, determine whether to send a click event at once.\n\
- *\n\
- * @param {Event} event\n\
- * @returns {boolean}\n\
- */\n\
-FastClick.prototype.onTouchEnd = function(event) {\n\
-\t'use strict';\n\
-\tvar forElement, trackingClickStart, targetTagName, scrollParent, touch, targetElement = this.targetElement;\n\
-\n\
-\tif (!this.trackingClick) {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\t// Prevent phantom clicks on fast double-tap (issue #36)\n\
-\tif ((event.timeStamp - this.lastClickTime) < 200) {\n\
-\t\tthis.cancelNextClick = true;\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\t// Reset to prevent wrong click cancel on input (issue #156).\n\
-\tthis.cancelNextClick = false;\n\
-\n\
-\tthis.lastClickTime = event.timeStamp;\n\
-\n\
-\ttrackingClickStart = this.trackingClickStart;\n\
-\tthis.trackingClick = false;\n\
-\tthis.trackingClickStart = 0;\n\
-\n\
-\t// On some iOS devices, the targetElement supplied with the event is invalid if the layer\n\
-\t// is performing a transition or scroll, and has to be re-detected manually. Note that\n\
-\t// for this to function correctly, it must be called *after* the event target is checked!\n\
-\t// See issue #57; also filed as rdar://13048589 .\n\
-\tif (this.deviceIsIOSWithBadTarget) {\n\
-\t\ttouch = event.changedTouches[0];\n\
-\n\
-\t\t// In certain cases arguments of elementFromPoint can be negative, so prevent setting targetElement to null\n\
-\t\ttargetElement = document.elementFromPoint(touch.pageX - window.pageXOffset, touch.pageY - window.pageYOffset) || targetElement;\n\
-\t\ttargetElement.fastClickScrollParent = this.targetElement.fastClickScrollParent;\n\
-\t}\n\
-\n\
-\ttargetTagName = targetElement.tagName.toLowerCase();\n\
-\tif (targetTagName === 'label') {\n\
-\t\tforElement = this.findControl(targetElement);\n\
-\t\tif (forElement) {\n\
-\t\t\tthis.focus(targetElement);\n\
-\t\t\tif (this.deviceIsAndroid) {\n\
-\t\t\t\treturn false;\n\
-\t\t\t}\n\
-\n\
-\t\t\ttargetElement = forElement;\n\
-\t\t}\n\
-\t} else if (this.needsFocus(targetElement)) {\n\
-\n\
-\t\t// Case 1: If the touch started a while ago (best guess is 100ms based on tests for issue #36) then focus will be triggered anyway. Return early and unset the target element reference so that the subsequent click will be allowed through.\n\
-\t\t// Case 2: Without this exception for input elements tapped when the document is contained in an iframe, then any inputted text won't be visible even though the value attribute is updated as the user types (issue #37).\n\
-\t\tif ((event.timeStamp - trackingClickStart) > 100 || (this.deviceIsIOS && window.top !== window && targetTagName === 'input')) {\n\
-\t\t\tthis.targetElement = null;\n\
-\t\t\treturn false;\n\
-\t\t}\n\
-\n\
-\t\tthis.focus(targetElement);\n\
-\n\
-\t\t// Select elements need the event to go through on iOS 4, otherwise the selector menu won't open.\n\
-\t\tif (!this.deviceIsIOS4 || targetTagName !== 'select') {\n\
-\t\t\tthis.targetElement = null;\n\
-\t\t\tevent.preventDefault();\n\
-\t\t}\n\
-\n\
-\t\treturn false;\n\
-\t}\n\
-\n\
-\tif (this.deviceIsIOS && !this.deviceIsIOS4) {\n\
-\n\
-\t\t// Don't send a synthetic click event if the target element is contained within a parent layer that was scrolled\n\
-\t\t// and this tap is being used to stop the scrolling (usually initiated by a fling - issue #42).\n\
-\t\tscrollParent = targetElement.fastClickScrollParent;\n\
-\t\tif (scrollParent && scrollParent.fastClickLastScrollTop !== scrollParent.scrollTop) {\n\
-\t\t\treturn true;\n\
-\t\t}\n\
-\t}\n\
-\n\
-\t// Prevent the actual click from going though - unless the target node is marked as requiring\n\
-\t// real clicks or if it is in the whitelist in which case only non-programmatic clicks are permitted.\n\
-\tif (!this.needsClick(targetElement)) {\n\
-\t\tevent.preventDefault();\n\
-\t\tthis.sendClick(targetElement, event);\n\
-\t}\n\
-\n\
-\treturn false;\n\
-};\n\
-\n\
-\n\
-/**\n\
- * On touch cancel, stop tracking the click.\n\
- *\n\
- * @returns {void}\n\
- */\n\
-FastClick.prototype.onTouchCancel = function() {\n\
-\t'use strict';\n\
-\tthis.trackingClick = false;\n\
-\tthis.targetElement = null;\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Determine mouse events which should be permitted.\n\
- *\n\
- * @param {Event} event\n\
- * @returns {boolean}\n\
- */\n\
-FastClick.prototype.onMouse = function(event) {\n\
-\t'use strict';\n\
-\n\
-\t// If a target element was never set (because a touch event was never fired) allow the event\n\
-\tif (!this.targetElement) {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\tif (event.forwardedTouchEvent) {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\t// Programmatically generated events targeting a specific element should be permitted\n\
-\tif (!event.cancelable) {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\t// Derive and check the target element to see whether the mouse event needs to be permitted;\n\
-\t// unless explicitly enabled, prevent non-touch click events from triggering actions,\n\
-\t// to prevent ghost/doubleclicks.\n\
-\tif (!this.needsClick(this.targetElement) || this.cancelNextClick) {\n\
-\n\
-\t\t// Prevent any user-added listeners declared on FastClick element from being fired.\n\
-\t\tif (event.stopImmediatePropagation) {\n\
-\t\t\tevent.stopImmediatePropagation();\n\
-\t\t} else {\n\
-\n\
-\t\t\t// Part of the hack for browsers that don't support Event#stopImmediatePropagation (e.g. Android 2)\n\
-\t\t\tevent.propagationStopped = true;\n\
-\t\t}\n\
-\n\
-\t\t// Cancel the event\n\
-\t\tevent.stopPropagation();\n\
-\t\tevent.preventDefault();\n\
-\n\
-\t\treturn false;\n\
-\t}\n\
-\n\
-\t// If the mouse event is permitted, return true for the action to go through.\n\
-\treturn true;\n\
-};\n\
-\n\
-\n\
-/**\n\
- * On actual clicks, determine whether this is a touch-generated click, a click action occurring\n\
- * naturally after a delay after a touch (which needs to be cancelled to avoid duplication), or\n\
- * an actual click which should be permitted.\n\
- *\n\
- * @param {Event} event\n\
- * @returns {boolean}\n\
- */\n\
-FastClick.prototype.onClick = function(event) {\n\
-\t'use strict';\n\
-\tvar permitted;\n\
-\n\
-\t// It's possible for another FastClick-like library delivered with third-party code to fire a click event before FastClick does (issue #44). In that case, set the click-tracking flag back to false and return early. This will cause onTouchEnd to return early.\n\
-\tif (this.trackingClick) {\n\
-\t\tthis.targetElement = null;\n\
-\t\tthis.trackingClick = false;\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\t// Very odd behaviour on iOS (issue #18): if a submit element is present inside a form and the user hits enter in the iOS simulator or clicks the Go button on the pop-up OS keyboard the a kind of 'fake' click event will be triggered with the submit-type input element as the target.\n\
-\tif (event.target.type === 'submit' && event.detail === 0) {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\tpermitted = this.onMouse(event);\n\
-\n\
-\t// Only unset targetElement if the click is not permitted. This will ensure that the check for !targetElement in onMouse fails and the browser's click doesn't go through.\n\
-\tif (!permitted) {\n\
-\t\tthis.targetElement = null;\n\
-\t}\n\
-\n\
-\t// If clicks are permitted, return true for the action to go through.\n\
-\treturn permitted;\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Remove all FastClick's event listeners.\n\
- *\n\
- * @returns {void}\n\
- */\n\
-FastClick.prototype.destroy = function() {\n\
-\t'use strict';\n\
-\tvar layer = this.layer;\n\
-\n\
-\tif (this.deviceIsAndroid) {\n\
-\t\tlayer.removeEventListener('mouseover', this.onMouse, true);\n\
-\t\tlayer.removeEventListener('mousedown', this.onMouse, true);\n\
-\t\tlayer.removeEventListener('mouseup', this.onMouse, true);\n\
-\t}\n\
-\n\
-\tlayer.removeEventListener('click', this.onClick, true);\n\
-\tlayer.removeEventListener('touchstart', this.onTouchStart, false);\n\
-\tlayer.removeEventListener('touchmove', this.onTouchMove, false);\n\
-\tlayer.removeEventListener('touchend', this.onTouchEnd, false);\n\
-\tlayer.removeEventListener('touchcancel', this.onTouchCancel, false);\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Check whether FastClick is needed.\n\
- *\n\
- * @param {Element} layer The layer to listen on\n\
- */\n\
-FastClick.notNeeded = function(layer) {\n\
-\t'use strict';\n\
-\tvar metaViewport;\n\
-\tvar chromeVersion;\n\
-\n\
-\t// Devices that don't support touch don't need FastClick\n\
-\tif (typeof window.ontouchstart === 'undefined') {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\t// Chrome version - zero for other browsers\n\
-\tchromeVersion = +(/Chrome\\/([0-9]+)/.exec(navigator.userAgent) || [,0])[1];\n\
-\n\
-\tif (chromeVersion) {\n\
-\n\
-\t\tif (FastClick.prototype.deviceIsAndroid) {\n\
-\t\t\tmetaViewport = document.querySelector('meta[name=viewport]');\n\
-\t\t\t\n\
-\t\t\tif (metaViewport) {\n\
-\t\t\t\t// Chrome on Android with user-scalable=\"no\" doesn't need FastClick (issue #89)\n\
-\t\t\t\tif (metaViewport.content.indexOf('user-scalable=no') !== -1) {\n\
-\t\t\t\t\treturn true;\n\
-\t\t\t\t}\n\
-\t\t\t\t// Chrome 32 and above with width=device-width or less don't need FastClick\n\
-\t\t\t\tif (chromeVersion > 31 && window.innerWidth <= window.screen.width) {\n\
-\t\t\t\t\treturn true;\n\
-\t\t\t\t}\n\
-\t\t\t}\n\
-\n\
-\t\t// Chrome desktop doesn't need FastClick (issue #15)\n\
-\t\t} else {\n\
-\t\t\treturn true;\n\
-\t\t}\n\
-\t}\n\
-\n\
-\t// IE10 with -ms-touch-action: none, which disables double-tap-to-zoom (issue #97)\n\
-\tif (layer.style.msTouchAction === 'none') {\n\
-\t\treturn true;\n\
-\t}\n\
-\n\
-\treturn false;\n\
-};\n\
-\n\
-\n\
-/**\n\
- * Factory method for creating a FastClick object\n\
- *\n\
- * @param {Element} layer The layer to listen on\n\
- */\n\
-FastClick.attach = function(layer) {\n\
-\t'use strict';\n\
-\treturn new FastClick(layer);\n\
-};\n\
-\n\
-\n\
-if (typeof define !== 'undefined' && define.amd) {\n\
-\n\
-\t// AMD. Register as an anonymous module.\n\
-\tdefine(function() {\n\
-\t\t'use strict';\n\
-\t\treturn FastClick;\n\
-\t});\n\
-} else if (typeof module !== 'undefined' && module.exports) {\n\
-\tmodule.exports = FastClick.attach;\n\
-\tmodule.exports.FastClick = FastClick;\n\
-} else {\n\
-\twindow.FastClick = FastClick;\n\
-}\n\
-//@ sourceURL=ftlabs-fastclick/lib/fastclick.js"
-));
-require.register("tower-event-directive/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var directive = require('tower-directive');\n\
-var fastclick = require('fastclick');\n\
-var event = require('event');\n\
-\n\
-/**\n\
- * Expose `eventDirective`.\n\
- */\n\
-\n\
-exports = module.exports = eventDirective;\n\
-\n\
-/**\n\
- * Events supported.\n\
- */\n\
-\n\
-exports.events = [\n\
-  'change',\n\
-  'click',\n\
-  'mousedown',\n\
-  'mouseup',\n\
-  'blur',\n\
-  'focus',\n\
-  'input',\n\
-  'keydown',\n\
-  'keypress',\n\
-  'keyup'\n\
-];\n\
-\n\
-/**\n\
- * Define event directive.\n\
- *\n\
- * @param {String} name Event name.\n\
- */\n\
-\n\
-function eventDirective(name) {\n\
-  if (!name) return all();\n\
-  if (directive.defined('on-' + name)) return;\n\
-\n\
-  if ('click' == name) {\n\
-    // add fast click.\n\
-    event.bind(window, 'load', onload);\n\
-\n\
-    function onload() {\n\
-      event.unbind(window, 'load', onload);\n\
-      fastclick(document.body);\n\
-    }\n\
-  }\n\
-\n\
-  directive('on-' + name, function(scope, el, exp){\n\
-\n\
-    // make link clickable\n\
-\n\
-    if ('a' === el.tagName.toLowerCase() && !el.getAttribute('href'))\n\
-      el.setAttribute('href', '#');\n\
-\n\
-    // listen\n\
-\n\
-    event.bind(el, name, handle);\n\
-\n\
-    // unlisten\n\
-\n\
-    scope.on('remove', function(){\n\
-      event.unbind(el, name, handle);\n\
-    });\n\
-\n\
-    function handle(e) {\n\
-      // so they can be used by expression\n\
-      scope.data.event = e;\n\
-      scope.data['this'] = el;\n\
-      var res = exp.fn(scope);\n\
-      delete scope.data.event;\n\
-      delete scope.data['this'];\n\
-      \n\
-      if (false === res) {\n\
-        e.preventDefault();\n\
-        e.stopPropagation();\n\
-        e.stopImmediatePropagation();\n\
-      }\n\
-    }\n\
-  });\n\
-}\n\
-\n\
-/**\n\
- * Define all event directives.\n\
- */\n\
-\n\
-function all() {\n\
-  for (var i = 0, n = exports.events.length; i < n; i++) {\n\
-    exports(exports.events[i]);\n\
-  }\n\
-}//@ sourceURL=tower-event-directive/index.js"
-));
-require.register("tower-text-directive/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var directive = require('tower-directive');\n\
-\n\
-/**\n\
- * Define `data-text` directive.\n\
- */\n\
-\n\
-directive('data-text', function(scope, el, exp){\n\
-  bind() && exp.watch(scope, bind);\n\
-\n\
-  function bind() {\n\
-    var val = exp.fn(scope);\n\
-    el.textContent = undefined === val ? '' : val;\n\
-    return exp;\n\
-  }\n\
-});//@ sourceURL=tower-text-directive/index.js"
-));
-require.register("tower-observable-array/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var Emitter = require('tower-emitter');\n\
-\n\
-/**\n\
- * Define property method.\n\
- */\n\
-\n\
-var defineProperty;\n\
-\n\
-try {\n\
-  // IE8 has it but it only works on DOM elements.\n\
-  Object.defineProperty({}, 'foo', { value: true });\n\
-  defineProperty = Object.defineProperty;\n\
-} catch (err) {\n\
-  defineProperty = function(obj, prop, desc){\n\
-    obj[prop] = desc.value;\n\
-  };\n\
-}\n\
-\n\
-var slice = Array.prototype.slice;\n\
-var proto = [];\n\
-\n\
-/**\n\
- * Define methods.\n\
- */\n\
-\n\
-var methods = {\n\
-  pop: pop,\n\
-  push: push, \n\
-  reverse: reverse,\n\
-  shift: shift,\n\
-  sort: sort,\n\
-  splice: splice,\n\
-  unshift: unshift\n\
-};\n\
-\n\
-/**\n\
- * Mixin `Emitter`.\n\
- */\n\
-\n\
-Emitter(methods);\n\
-\n\
-for (var method in methods)\n\
-  defineMethod(method, methods[method]);\n\
-\n\
-function defineMethod(name, fn) {\n\
-  defineProperty(proto, name, { value: fn });\n\
-}\n\
-\n\
-// if a modern browser\n\
-if ({}.__proto__) {\n\
-  var wrap = function wrap(arr) {\n\
-    if (arr.__observable__) return arr;\n\
-    arr.__observable__ = true;\n\
-    arr.__proto__ = proto;\n\
-    return arr;\n\
-  }\n\
-\n\
-  var unwrap = function unwrap(arr) {\n\
-    delete arr.__observable__;\n\
-    arr.__proto__ = Array.prototype;\n\
-    return arr;\n\
-  }\n\
-} else {\n\
-  var wrap = function wrap(arr) {\n\
-    if (arr.__observable__) return arr;\n\
-    arr.__observable__ = true;\n\
-    for (var name in methods) {\n\
-      defineProperty(arr, name, {\n\
-        value: proto[name],\n\
-        configurable: true\n\
-      });\n\
-    }\n\
-    return arr;\n\
-  };\n\
-\n\
-  var unwrap = function unwrap(arr) {\n\
-    for (var name in methods) {\n\
-      delete arr[name];\n\
-    }\n\
-    delete arr.__observable__;\n\
-    return arr;\n\
-  };\n\
-}\n\
-\n\
-/**\n\
- * Expose `wrap`.\n\
- */\n\
-\n\
-exports = module.exports = wrap;\n\
-\n\
-/**\n\
- * Expose `unwrap`.\n\
- */\n\
-\n\
-exports.unwrap = unwrap;\n\
-\n\
-/**\n\
- * Add an element to the end of the collection.\n\
- *\n\
- * @return {Integer} The collection length.\n\
- * @api public\n\
- */\n\
-\n\
-function push() {\n\
-  var startIndex = this.length;\n\
-  var result = Array.prototype.push.apply(this, arguments);\n\
-  if (this.hasListeners('add'))\n\
-    this.emit('add', this.slice(startIndex, this.length), startIndex);\n\
-  return result;\n\
-}\n\
-\n\
-/**\n\
- * Remove the last element from the collection.\n\
- *\n\
- * @return {Integer} The collection length.\n\
- * @api public\n\
- */\n\
-\n\
-function pop() {\n\
-  var startIndex = this.length;\n\
-  var result = Array.prototype.pop.apply(this, arguments);\n\
-  if (this.hasListeners('remove'))\n\
-    this.emit('remove', [result], startIndex - 1);\n\
-  return result;\n\
-}\n\
-\n\
-/**\n\
- * Remove the first element from the collection.\n\
- *\n\
- * @return {Integer} The collection length.\n\
- * @api public\n\
- */\n\
-\n\
-function shift() {\n\
-  var startIndex = this.length;\n\
-  var result = Array.prototype.shift.apply(this, arguments);\n\
-  if (this.hasListeners('remove'))\n\
-    this.emit('remove', [result], 0);\n\
-  return result;\n\
-}\n\
-\n\
-/**\n\
- * Add an element to the beginning of the collection.\n\
- *\n\
- * @api public\n\
- */\n\
-\n\
-function unshift() {\n\
-  var length = this.length;\n\
-  var result = Array.prototype.unshift.apply(this, arguments);\n\
-  if (this.hasListeners('add'))\n\
-    this.emit('add', this.slice(0, this.length - length), 0);\n\
-  return result;\n\
-}\n\
-\n\
-// XXX: maybe it emits a `replace` event if \n\
-// it both adds and removes at the same time.\n\
-function splice(index, length) {\n\
-  var startIndex = this.length;\n\
-  var removed = Array.prototype.splice.apply(this, arguments);\n\
-  this.length = this.length;\n\
-  if (removed.length && this.hasListeners('remove')) {\n\
-    this.emit('remove', removed, index);\n\
-  }\n\
-  if (arguments.length > 2 && this.hasListeners('add')) {\n\
-    this.emit('add', slice.call(arguments, 2), index);\n\
-  }\n\
-  return removed;\n\
-}\n\
-\n\
-function reverse() {\n\
-  var result = Array.prototype.reverse.apply(this, arguments);\n\
-  this.emit('sort');\n\
-  return result;\n\
-}\n\
-\n\
-function sort() {\n\
-  var result = Array.prototype.sort.apply(this, arguments);\n\
-  this.emit('sort');\n\
-  return result;\n\
-}\n\
-\n\
-/**\n\
- * Reset the collection's data with a new set of data.\n\
- *\n\
- * @param {Array} arr The data to store on the collection.\n\
- * @api public\n\
- */\n\
-\n\
-function reset(arr) {\n\
-  this.emit('reset', arr);\n\
-}\n\
-\n\
-/**\n\
- * Apply an array function on the collection's data array.\n\
- * \n\
- * @param {String} name An array method property. Example: 'shift', 'push'.\n\
- * @param {Array} args Method argument list.\n\
- * @return {Mixed} Whatever the array method returns.\n\
- * @api private\n\
- */\n\
-\n\
-function apply(name, args) {\n\
-  //this.__updating__ = true;\n\
-  return Array.prototype[name].apply(this, args);\n\
-  //delete this.__updating__;\n\
-};//@ sourceURL=tower-observable-array/index.js"
-));
-require.register("tower-list-directive/index.js", Function("exports, require, module",
-"\n\
-/**\n\
- * Module dependencies.\n\
- */\n\
-\n\
-var directive = require('tower-directive');\n\
-var content = require('tower-content');\n\
-var template = require('tower-template');\n\
-var oid = require('tower-oid');\n\
-var observable = require('tower-observable-array');\n\
-\n\
-/**\n\
- * Expose `document`.\n\
- *\n\
- * This makes it so you can set the `document` on the server,\n\
- * for server-side templates.\n\
- */\n\
-\n\
-exports.document = 'undefined' !== typeof document && document;\n\
-\n\
-/**\n\
- * Define the list directive.\n\
- */\n\
-\n\
-directive('data-each', function(templateEl, exp, nodeFn){\n\
-  var name = exp.val;\n\
-\n\
-  /**\n\
-   * List directive.\n\
-   *\n\
-   * 1. compute new items added that are not visible (so, have array of visible items)\n\
-   * 2. compute which new items will be visible if inserted\n\
-   *    (remove ones that won't be visible)\n\
-   * 3. for each new item\n\
-   *  - if (buffer.length) pop element from buffer, then apply scope\n\
-   *  - else templateFn.clone(scope)\n\
-   * 4. insert new item into DOM at correct position.\n\
-   *    (so, basically it has a sorted collection, listening for events)\n\
-   */\n\
-\n\
-  function exec(scope, el, exp) {\n\
-    var cursor = el;\n\
-    var cache = el.cache || (el.cache = {});\n\
-    var scopeCache = {};\n\
-\n\
-    // e.g. todos\n\
-\n\
-    var array = exp.col.fn(scope) || []; // exp.col === collection (array or object)\n\
-\n\
-    // update DOM with [possibly] new array\n\
-    change(array);\n\
-\n\
-    // XXX: if (exp.bindTo)\n\
-\n\
-    observable(array);\n\
-\n\
-    // watch for changes in array\n\
-\n\
-    watch(array);\n\
-\n\
-    // reeval when column changes.\n\
-    // watch for changes in expression,\n\
-    // which means the array has been reset.\n\
-    exp.col.watch(scope, function(){\n\
-      unwatch(array);\n\
-      array = exp.col.fn(scope);\n\
-      cursor = el;\n\
-      observable(array);\n\
-      resetHandler(array);\n\
-    });\n\
-\n\
-    /**\n\
-     * When items have been added to array.\n\
-     */\n\
-\n\
-    function change(arr, index) {\n\
-      if (!arr) return;\n\
-      if (null == index) {\n\
-        // find index;\n\
-        index = 0;\n\
-        for (var i = 0; i < cursor.parentNode.childNodes.length; i++) {\n\
-          if (cursor == cursor.parentNode.childNodes[i]) {\n\
-            index = i;\n\
-            break;\n\
-          }\n\
-        } \n\
-      }\n\
-      \n\
-      // starting place for adding.\n\
-      cursor = cursor.parentNode.childNodes[index];\n\
-\n\
-      for (var i = 0, n = arr.length; i < n; i++) {\n\
-        // XXX: should allow tracking by custom tracking function\n\
-        // (such as by `id`), but for now just by index.\n\
-        var displacedIndex = i + index;\n\
-        var id = getId(arr[i], displacedIndex);\n\
-\n\
-        // if it's already been processed, then continue.\n\
-        if (cache[id]) continue;\n\
-\n\
-        var attrs = {\n\
-          index: displacedIndex,\n\
-          first: 0 === displacedIndex,\n\
-          last: (displacedIndex + n - 1) === displacedIndex\n\
-        };\n\
-\n\
-        attrs.middle = !(attrs.first || attrs.last);\n\
-        //attrs.even = 0 === attrs.index % 2;\n\
-        //attrs.odd = !attrs.even;\n\
-\n\
-        attrs[name] = arr[i];\n\
-        var childScope = content(name || 'anonymous').init(attrs, scope);\n\
-        var childEl = templateEl.cloneNode(true);\n\
-        cache[id] = childEl;\n\
-        cursor.parentNode.insertBefore(childEl, cursor.nextSibling);\n\
-        scopeCache[id] = childScope;\n\
-        cursor = childEl;\n\
-        nodeFn(childScope, childEl);\n\
-      }\n\
-    }\n\
-\n\
-    /**\n\
-     * Item removed from array.\n\
-     */\n\
-\n\
-    function remove(id) {\n\
-      if (cache[id]) {\n\
-        cursor = cache[id].previousSibling || el;\n\
-        cache[id].parentNode.removeChild(cache[id]);\n\
-        scopeCache[id].remove();\n\
-        delete cache[id];\n\
-        delete scopeCache[id];\n\
-      }\n\
-    }\n\
-\n\
-    /**\n\
-     * Observe array.\n\
-     */\n\
-\n\
-    function watch(arr) {\n\
-      arr.on('add', addHandler);\n\
-      arr.on('remove', removeHandler);\n\
-      arr.on('reset', resetHandler);\n\
-      arr.on('sort', sortHandler);\n\
-    }\n\
-\n\
-    /**\n\
-     * Stop observing array.\n\
-     */\n\
-\n\
-    function unwatch(arr) {\n\
-      arr.off('add', addHandler);\n\
-      arr.off('remove', removeHandler);\n\
-      arr.off('reset', resetHandler);\n\
-      arr.off('sort', sortHandler);\n\
-    }\n\
-\n\
-    /**\n\
-     * When items are added to array.\n\
-     */\n\
-\n\
-    function addHandler(arr, index) {\n\
-      change(arr, index);\n\
-    }\n\
-\n\
-    /**\n\
-     * When items are removed from array.\n\
-     */\n\
-\n\
-    function removeHandler(arr, index) {\n\
-      for (var i = 0, n = arr.length; i < n; i++) {\n\
-        remove(getId(arr[i], i + index));\n\
-      }\n\
-    }\n\
-\n\
-    /**\n\
-     * When array is reset.\n\
-     */\n\
-\n\
-    function resetHandler(arr) {\n\
-      for (var id in cache) {\n\
-        remove(id);\n\
-      }\n\
-      change(arr);\n\
-    }\n\
-\n\
-    // https://github.com/component/sort/blob/master/index.js\n\
-    function sortHandler() {\n\
-      // sort the elements\n\
-      for (var i = 0, n = array.length; i < n; i++) {\n\
-        var id = getId(array[i]);\n\
-        var childEl = cache[id];\n\
-        // XXX: handle when there's 10 items showing but 100 items in the array\n\
-        // XXX: also, maybe optimize by detaching and adding once?\n\
-        childEl.parentNode.appendChild(childEl);\n\
-      }\n\
-    }\n\
-\n\
-    // XXX: needs to handle tracking by custom properties.\n\
-    function getId(record, index) {\n\
-      return oid(record) || index;\n\
-    }\n\
-\n\
-    // when scope is removed, clean up all listeners.\n\
-    scope.on('remove', function(){\n\
-      for (var id in cache) {\n\
-        delete cache[id];\n\
-        delete scopeCache[id];\n\
-      }\n\
-      unwatch(array);\n\
-    });\n\
-  }\n\
-\n\
-  return exec;\n\
-}, true).terminal().meta().priority(10000).expression('data-list');//@ sourceURL=tower-list-directive/index.js"
-));
-require.register("visionmedia-debug/index.js", Function("exports, require, module",
-"if ('undefined' == typeof window) {\n\
-  module.exports = require('./lib/debug');\n\
-} else {\n\
-  module.exports = require('./debug');\n\
-}\n\
-//@ sourceURL=visionmedia-debug/index.js"
-));
 require.register("visionmedia-debug/debug.js", Function("exports, require, module",
 "\n\
 /**\n\
@@ -14699,12 +10603,6 @@ require.register("openautomation/index.js", Function("exports, require, module",
  */\n\
 \n\
 var adapter = require('./lib/rest');\n\
-var template = require('tower-template');\n\
-require('tower-list-directive');\n\
-require('tower-text-directive');\n\
-var event = require('tower-event-directive');\n\
-event('click');\n\
-var content = require('tower-content');\n\
 var query = require('tower-query');\n\
 query.use(adapter);\n\
 var resource = require('tower-resource');\n\
@@ -14717,6 +10615,12 @@ var SVG = require('svg.js').SVG;\n\
 var drawing = SVG('sprites').fixSubPixelOffset();\n\
 \n\
 /**\n\
+ * Angular stuff.\n\
+ */\n\
+\n\
+var app = angular.module('App', []);\n\
+\n\
+/**\n\
  * Lab equipment.\n\
  */\n\
 \n\
@@ -14726,61 +10630,64 @@ var PetriDish = require('./lib/petri-dish');\n\
 \n\
 require('live-css').start();\n\
 \n\
-content('root')\n\
-  .action('run', function(){\n\
-    \n\
-  })\n\
-  .action('edit', function(){\n\
+app.controller('StepsController', function ($scope){\n\
+  $scope.view = 'steps';\n\
 \n\
-  });\n\
+  $scope.steps = [\n\
+    { title: 'Add sample to each microplate well',\n\
+      variables: [\n\
+        { name: 'Liquid', value: 'Liquid A', type: 'array' },\n\
+        { name: 'Volume (ml)', value: 10, type: 'number' },\n\
+        { name: 'Wells', value: '1-5', type: 'microplate' } ] },\n\
+    { title: 'Incubate microplate',\n\
+      variables: [\n\
+        { name: 'Temperature (C)', value: 37, type: 'number' },\n\
+        { name: 'Duration (min)', value: 60, type: 'number' } ] },\n\
+    { title: 'Wash microplate',\n\
+      variables: [\n\
+        { name: 'Times', value: 4, type: 'number' } ] }\n\
+  ];\n\
 \n\
-/**\n\
- * Add :volume of :solution to :containers\n\
-  - Incubate :container at :temperature for :duration\n\
-  - Measure :property at :constraints (Read absorbance...)\n\
-  - Discard :solution from :containers\n\
- */\n\
-/**\n\
- * \n\
- */\n\
-var steps = [\n\
-  'Add 100ul of negative or positive control or sample to each well',\n\
-  'Incubate the plate at 37C for 60min',\n\
-  'Discard the solution in each well (aspirating or decanting)',\n\
-  'Repeat 4-6 times (this is a \"wash\" recipe):',\n\
-  '  - Add 200-300ul washing buffer to each well',\n\
-  '  - Discard solution in each well',\n\
-  'Aspirate or decant each well to ensure no fluid',\n\
-  'Invert plate and blot on paper towel',\n\
-  'Add 100ul Enzyme Conjugate to each well',\n\
-  'Incubate plate at 37C for 30min',\n\
-  'Repeat 4-6 times (this is a \"wash\" recipe again):',\n\
-  '  - Add 200-300ul washing buffer to each well',\n\
-  '  - Discard solution in each well',\n\
-  'Add 100ul of Substrate (TMB) Solution to each well',\n\
-  'Incubate at 37C for 15min (protect from light)',\n\
-  'Add 100ul of Stop Solution to each well and mix *well*',\n\
-  'Read absorbance at 450nm within 30min after adding '\n\
-];\n\
+  $scope.liquids = [\n\
+    'Liquid A',\n\
+    'Liquid B'\n\
+  ];\n\
 \n\
-var parser = require('./lib/steps');\n\
-parser.use(/(\\w+)\\s(\\w+)[^\\d]+(\\d+C)[^\\d]+(\\d+min)/, function(_, action, object, temperature, duration){\n\
-  return {\n\
-    action: action, \n\
-    object: object, \n\
-    temperature: temperature,\n\
-    duration: duration\n\
-  }\n\
-});\n\
+  $scope.selectWells = function(){\n\
+    $scope.view = 'step';\n\
+    $scope.activeVariable = null;\n\
+  };\n\
 \n\
-console.log(parser(steps[0]));\n\
+  $scope.selectValue = function(liquid){\n\
+    $scope.view = 'step';\n\
+    $scope.activeVariable.value = liquid;\n\
+    $scope.activeVariable = null;\n\
+  };\n\
 \n\
-/**\n\
- * Template.\n\
- */\n\
+  $scope.showVariable = function(variable) {\n\
+    // don't change screen if it's simple\n\
+    if ('number' == variable.type) return;\n\
+    $scope.view = 'variable';\n\
+    $scope.activeVariable = variable;\n\
+  };\n\
 \n\
-template(document.body)({\n\
-  steps: steps\n\
+  $scope.showStep = function(step){\n\
+    $scope.view = 'step';\n\
+    $scope.activeStep = step;\n\
+  };\n\
+\n\
+  $scope.showSteps = function(){\n\
+    $scope.view = 'steps';\n\
+    $scope.activeStep = null;\n\
+  };\n\
+\n\
+  $scope.run = function(){\n\
+    agent.post('/run')\n\
+      .send($scope.steps)\n\
+      .end(function(res){\n\
+        console.log(res.body);\n\
+      });\n\
+  };\n\
 });\n\
 \n\
 /**\n\
@@ -14804,7 +10711,7 @@ var paused = false;\n\
 var videostream;\n\
 var gif = 'data:image/gif;base64,R0lGODlhEAAJAIAAAP///wAAACH5BAEAAAAALAAAAAAQAAkAAAIKhI+py+0Po5yUFQA7';\n\
 document.querySelector('.snapshot').src = gif;\n\
-events.bind(window, 'click', function(e){\n\
+events.bind(window, 'clicks', function(e){\n\
   if (e.target.tagName.toLowerCase() == 'input') return;\n\
   if (paused) {\n\
     document.querySelector('.snapshot').src = gif;\n\
@@ -14937,22 +10844,6 @@ function tick() {\n\
   }\n\
 }//@ sourceURL=openautomation/index.js"
 ));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -15974,710 +11865,6 @@ require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js"
 require.alias("tower-load/index.js", "tower-adapter/deps/tower-load/index.js");
 
 
-require.alias("tower-template/index.js", "openautomation/deps/tower-template/index.js");
-require.alias("tower-template/index.js", "tower-template/index.js");
-require.alias("tower-directive/index.js", "tower-template/deps/tower-directive/index.js");
-require.alias("tower-directive/lib/statics.js", "tower-template/deps/tower-directive/lib/statics.js");
-require.alias("tower-directive/lib/proto.js", "tower-template/deps/tower-directive/lib/proto.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-directive-expression/index.js", "tower-directive/deps/tower-directive-expression/index.js");
-require.alias("tower-directive-expression/lib/compiler.js", "tower-directive/deps/tower-directive-expression/lib/compiler.js");
-require.alias("tower-directive-expression/lib/expressions.js", "tower-directive/deps/tower-directive-expression/lib/expressions.js");
-require.alias("tower-directive-expression/lib/path.js", "tower-directive/deps/tower-directive-expression/lib/path.js");
-require.alias("tower-expression/index.js", "tower-directive-expression/deps/tower-expression/index.js");
-
-require.alias("tower-js-expressions/index.js", "tower-directive-expression/deps/tower-js-expressions/index.js");
-require.alias("tower-expression/index.js", "tower-js-expressions/deps/tower-expression/index.js");
-
-require.alias("part-is-array/index.js", "tower-js-expressions/deps/part-is-array/index.js");
-
-require.alias("tower-filter/index.js", "tower-directive-expression/deps/tower-filter/index.js");
-
-require.alias("part-is-array/index.js", "tower-directive-expression/deps/part-is-array/index.js");
-
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-content/lib/proto.js", "tower-directive/deps/tower-content/lib/proto.js");
-require.alias("tower-content/lib/statics.js", "tower-directive/deps/tower-content/lib/statics.js");
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-attr/index.js", "tower-content/deps/tower-attr/index.js");
-require.alias("tower-attr/lib/validators.js", "tower-content/deps/tower-attr/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
-require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
-
-require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
-
-require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
-
-require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
-
-require.alias("tower-accessor/index.js", "tower-content/deps/tower-accessor/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-oid/index.js", "tower-accessor/deps/tower-oid/index.js");
-
-require.alias("component-indexof/index.js", "tower-content/deps/indexof/index.js");
-
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("component-event/index.js", "tower-directive/deps/event/index.js");
-
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-type/index.js", "component-value/deps/type/index.js");
-
-require.alias("component-value/index.js", "component-value/index.js");
-require.alias("tower-content/index.js", "tower-template/deps/tower-content/index.js");
-require.alias("tower-content/lib/proto.js", "tower-template/deps/tower-content/lib/proto.js");
-require.alias("tower-content/lib/statics.js", "tower-template/deps/tower-content/lib/statics.js");
-require.alias("tower-content/index.js", "tower-template/deps/tower-content/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-attr/index.js", "tower-content/deps/tower-attr/index.js");
-require.alias("tower-attr/lib/validators.js", "tower-content/deps/tower-attr/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
-require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
-
-require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
-
-require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
-
-require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
-
-require.alias("tower-accessor/index.js", "tower-content/deps/tower-accessor/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-oid/index.js", "tower-accessor/deps/tower-oid/index.js");
-
-require.alias("component-indexof/index.js", "tower-content/deps/indexof/index.js");
-
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("tower-content/index.js", "openautomation/deps/tower-content/index.js");
-require.alias("tower-content/lib/proto.js", "openautomation/deps/tower-content/lib/proto.js");
-require.alias("tower-content/lib/statics.js", "openautomation/deps/tower-content/lib/statics.js");
-require.alias("tower-content/index.js", "openautomation/deps/tower-content/index.js");
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-attr/index.js", "tower-content/deps/tower-attr/index.js");
-require.alias("tower-attr/lib/validators.js", "tower-content/deps/tower-attr/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
-require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
-
-require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
-
-require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
-
-require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
-
-require.alias("tower-accessor/index.js", "tower-content/deps/tower-accessor/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-oid/index.js", "tower-accessor/deps/tower-oid/index.js");
-
-require.alias("component-indexof/index.js", "tower-content/deps/indexof/index.js");
-
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("tower-event-directive/index.js", "openautomation/deps/tower-event-directive/index.js");
-require.alias("tower-event-directive/index.js", "tower-event-directive/index.js");
-require.alias("component-event/index.js", "tower-event-directive/deps/event/index.js");
-
-require.alias("tower-directive/index.js", "tower-event-directive/deps/tower-directive/index.js");
-require.alias("tower-directive/lib/statics.js", "tower-event-directive/deps/tower-directive/lib/statics.js");
-require.alias("tower-directive/lib/proto.js", "tower-event-directive/deps/tower-directive/lib/proto.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-directive-expression/index.js", "tower-directive/deps/tower-directive-expression/index.js");
-require.alias("tower-directive-expression/lib/compiler.js", "tower-directive/deps/tower-directive-expression/lib/compiler.js");
-require.alias("tower-directive-expression/lib/expressions.js", "tower-directive/deps/tower-directive-expression/lib/expressions.js");
-require.alias("tower-directive-expression/lib/path.js", "tower-directive/deps/tower-directive-expression/lib/path.js");
-require.alias("tower-expression/index.js", "tower-directive-expression/deps/tower-expression/index.js");
-
-require.alias("tower-js-expressions/index.js", "tower-directive-expression/deps/tower-js-expressions/index.js");
-require.alias("tower-expression/index.js", "tower-js-expressions/deps/tower-expression/index.js");
-
-require.alias("part-is-array/index.js", "tower-js-expressions/deps/part-is-array/index.js");
-
-require.alias("tower-filter/index.js", "tower-directive-expression/deps/tower-filter/index.js");
-
-require.alias("part-is-array/index.js", "tower-directive-expression/deps/part-is-array/index.js");
-
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-content/lib/proto.js", "tower-directive/deps/tower-content/lib/proto.js");
-require.alias("tower-content/lib/statics.js", "tower-directive/deps/tower-content/lib/statics.js");
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-attr/index.js", "tower-content/deps/tower-attr/index.js");
-require.alias("tower-attr/lib/validators.js", "tower-content/deps/tower-attr/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
-require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
-
-require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
-
-require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
-
-require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
-
-require.alias("tower-accessor/index.js", "tower-content/deps/tower-accessor/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-oid/index.js", "tower-accessor/deps/tower-oid/index.js");
-
-require.alias("component-indexof/index.js", "tower-content/deps/indexof/index.js");
-
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("component-event/index.js", "tower-directive/deps/event/index.js");
-
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-type/index.js", "component-value/deps/type/index.js");
-
-require.alias("component-value/index.js", "component-value/index.js");
-require.alias("ftlabs-fastclick/lib/fastclick.js", "tower-event-directive/deps/fastclick/lib/fastclick.js");
-require.alias("ftlabs-fastclick/lib/fastclick.js", "tower-event-directive/deps/fastclick/index.js");
-require.alias("ftlabs-fastclick/lib/fastclick.js", "ftlabs-fastclick/index.js");
-require.alias("tower-text-directive/index.js", "openautomation/deps/tower-text-directive/index.js");
-require.alias("tower-text-directive/index.js", "tower-text-directive/index.js");
-require.alias("tower-directive/index.js", "tower-text-directive/deps/tower-directive/index.js");
-require.alias("tower-directive/lib/statics.js", "tower-text-directive/deps/tower-directive/lib/statics.js");
-require.alias("tower-directive/lib/proto.js", "tower-text-directive/deps/tower-directive/lib/proto.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-directive-expression/index.js", "tower-directive/deps/tower-directive-expression/index.js");
-require.alias("tower-directive-expression/lib/compiler.js", "tower-directive/deps/tower-directive-expression/lib/compiler.js");
-require.alias("tower-directive-expression/lib/expressions.js", "tower-directive/deps/tower-directive-expression/lib/expressions.js");
-require.alias("tower-directive-expression/lib/path.js", "tower-directive/deps/tower-directive-expression/lib/path.js");
-require.alias("tower-expression/index.js", "tower-directive-expression/deps/tower-expression/index.js");
-
-require.alias("tower-js-expressions/index.js", "tower-directive-expression/deps/tower-js-expressions/index.js");
-require.alias("tower-expression/index.js", "tower-js-expressions/deps/tower-expression/index.js");
-
-require.alias("part-is-array/index.js", "tower-js-expressions/deps/part-is-array/index.js");
-
-require.alias("tower-filter/index.js", "tower-directive-expression/deps/tower-filter/index.js");
-
-require.alias("part-is-array/index.js", "tower-directive-expression/deps/part-is-array/index.js");
-
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-content/lib/proto.js", "tower-directive/deps/tower-content/lib/proto.js");
-require.alias("tower-content/lib/statics.js", "tower-directive/deps/tower-content/lib/statics.js");
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-attr/index.js", "tower-content/deps/tower-attr/index.js");
-require.alias("tower-attr/lib/validators.js", "tower-content/deps/tower-attr/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
-require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
-
-require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
-
-require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
-
-require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
-
-require.alias("tower-accessor/index.js", "tower-content/deps/tower-accessor/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-oid/index.js", "tower-accessor/deps/tower-oid/index.js");
-
-require.alias("component-indexof/index.js", "tower-content/deps/indexof/index.js");
-
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("component-event/index.js", "tower-directive/deps/event/index.js");
-
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-type/index.js", "component-value/deps/type/index.js");
-
-require.alias("component-value/index.js", "component-value/index.js");
-require.alias("tower-list-directive/index.js", "openautomation/deps/tower-list-directive/index.js");
-require.alias("tower-list-directive/index.js", "tower-list-directive/index.js");
-require.alias("tower-directive/index.js", "tower-list-directive/deps/tower-directive/index.js");
-require.alias("tower-directive/lib/statics.js", "tower-list-directive/deps/tower-directive/lib/statics.js");
-require.alias("tower-directive/lib/proto.js", "tower-list-directive/deps/tower-directive/lib/proto.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-directive-expression/index.js", "tower-directive/deps/tower-directive-expression/index.js");
-require.alias("tower-directive-expression/lib/compiler.js", "tower-directive/deps/tower-directive-expression/lib/compiler.js");
-require.alias("tower-directive-expression/lib/expressions.js", "tower-directive/deps/tower-directive-expression/lib/expressions.js");
-require.alias("tower-directive-expression/lib/path.js", "tower-directive/deps/tower-directive-expression/lib/path.js");
-require.alias("tower-expression/index.js", "tower-directive-expression/deps/tower-expression/index.js");
-
-require.alias("tower-js-expressions/index.js", "tower-directive-expression/deps/tower-js-expressions/index.js");
-require.alias("tower-expression/index.js", "tower-js-expressions/deps/tower-expression/index.js");
-
-require.alias("part-is-array/index.js", "tower-js-expressions/deps/part-is-array/index.js");
-
-require.alias("tower-filter/index.js", "tower-directive-expression/deps/tower-filter/index.js");
-
-require.alias("part-is-array/index.js", "tower-directive-expression/deps/part-is-array/index.js");
-
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-content/lib/proto.js", "tower-directive/deps/tower-content/lib/proto.js");
-require.alias("tower-content/lib/statics.js", "tower-directive/deps/tower-content/lib/statics.js");
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-attr/index.js", "tower-content/deps/tower-attr/index.js");
-require.alias("tower-attr/lib/validators.js", "tower-content/deps/tower-attr/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
-require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
-
-require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
-
-require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
-
-require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
-
-require.alias("tower-accessor/index.js", "tower-content/deps/tower-accessor/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-oid/index.js", "tower-accessor/deps/tower-oid/index.js");
-
-require.alias("component-indexof/index.js", "tower-content/deps/indexof/index.js");
-
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("component-event/index.js", "tower-directive/deps/event/index.js");
-
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-type/index.js", "component-value/deps/type/index.js");
-
-require.alias("component-value/index.js", "component-value/index.js");
-require.alias("tower-content/index.js", "tower-list-directive/deps/tower-content/index.js");
-require.alias("tower-content/lib/proto.js", "tower-list-directive/deps/tower-content/lib/proto.js");
-require.alias("tower-content/lib/statics.js", "tower-list-directive/deps/tower-content/lib/statics.js");
-require.alias("tower-content/index.js", "tower-list-directive/deps/tower-content/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-attr/index.js", "tower-content/deps/tower-attr/index.js");
-require.alias("tower-attr/lib/validators.js", "tower-content/deps/tower-attr/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
-require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
-
-require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
-
-require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
-
-require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
-
-require.alias("tower-accessor/index.js", "tower-content/deps/tower-accessor/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-oid/index.js", "tower-accessor/deps/tower-oid/index.js");
-
-require.alias("component-indexof/index.js", "tower-content/deps/indexof/index.js");
-
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("tower-template/index.js", "tower-list-directive/deps/tower-template/index.js");
-require.alias("tower-directive/index.js", "tower-template/deps/tower-directive/index.js");
-require.alias("tower-directive/lib/statics.js", "tower-template/deps/tower-directive/lib/statics.js");
-require.alias("tower-directive/lib/proto.js", "tower-template/deps/tower-directive/lib/proto.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-directive/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-directive-expression/index.js", "tower-directive/deps/tower-directive-expression/index.js");
-require.alias("tower-directive-expression/lib/compiler.js", "tower-directive/deps/tower-directive-expression/lib/compiler.js");
-require.alias("tower-directive-expression/lib/expressions.js", "tower-directive/deps/tower-directive-expression/lib/expressions.js");
-require.alias("tower-directive-expression/lib/path.js", "tower-directive/deps/tower-directive-expression/lib/path.js");
-require.alias("tower-expression/index.js", "tower-directive-expression/deps/tower-expression/index.js");
-
-require.alias("tower-js-expressions/index.js", "tower-directive-expression/deps/tower-js-expressions/index.js");
-require.alias("tower-expression/index.js", "tower-js-expressions/deps/tower-expression/index.js");
-
-require.alias("part-is-array/index.js", "tower-js-expressions/deps/part-is-array/index.js");
-
-require.alias("tower-filter/index.js", "tower-directive-expression/deps/tower-filter/index.js");
-
-require.alias("part-is-array/index.js", "tower-directive-expression/deps/part-is-array/index.js");
-
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-content/lib/proto.js", "tower-directive/deps/tower-content/lib/proto.js");
-require.alias("tower-content/lib/statics.js", "tower-directive/deps/tower-content/lib/statics.js");
-require.alias("tower-content/index.js", "tower-directive/deps/tower-content/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-attr/index.js", "tower-content/deps/tower-attr/index.js");
-require.alias("tower-attr/lib/validators.js", "tower-content/deps/tower-attr/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
-require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
-
-require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
-
-require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
-
-require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
-
-require.alias("tower-accessor/index.js", "tower-content/deps/tower-accessor/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-oid/index.js", "tower-accessor/deps/tower-oid/index.js");
-
-require.alias("component-indexof/index.js", "tower-content/deps/indexof/index.js");
-
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("component-event/index.js", "tower-directive/deps/event/index.js");
-
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-value/index.js", "tower-directive/deps/value/index.js");
-require.alias("component-type/index.js", "component-value/deps/type/index.js");
-
-require.alias("component-value/index.js", "component-value/index.js");
-require.alias("tower-content/index.js", "tower-template/deps/tower-content/index.js");
-require.alias("tower-content/lib/proto.js", "tower-template/deps/tower-content/lib/proto.js");
-require.alias("tower-content/lib/statics.js", "tower-template/deps/tower-content/lib/statics.js");
-require.alias("tower-content/index.js", "tower-template/deps/tower-content/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-content/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-attr/index.js", "tower-content/deps/tower-attr/index.js");
-require.alias("tower-attr/lib/validators.js", "tower-content/deps/tower-attr/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-attr/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-attr/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("tower-type/index.js", "tower-attr/deps/tower-type/index.js");
-require.alias("tower-type/lib/types.js", "tower-attr/deps/tower-type/lib/types.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-type/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("tower-validator/lib/validators.js", "tower-type/deps/tower-validator/lib/validators.js");
-require.alias("tower-validator/index.js", "tower-type/deps/tower-validator/index.js");
-require.alias("component-indexof/index.js", "tower-validator/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-validator/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-validator/index.js", "tower-validator/index.js");
-require.alias("part-is-array/index.js", "tower-type/deps/part-is-array/index.js");
-
-require.alias("part-is-blank/index.js", "tower-attr/deps/part-is-blank/index.js");
-
-require.alias("part-async-series/index.js", "tower-attr/deps/part-async-series/index.js");
-
-require.alias("component-type/index.js", "tower-attr/deps/type/index.js");
-
-require.alias("tower-accessor/index.js", "tower-content/deps/tower-accessor/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-accessor/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
-require.alias("tower-oid/index.js", "tower-accessor/deps/tower-oid/index.js");
-
-require.alias("component-indexof/index.js", "tower-content/deps/indexof/index.js");
-
-require.alias("tower-content/index.js", "tower-content/index.js");
-require.alias("tower-oid/index.js", "tower-list-directive/deps/tower-oid/index.js");
-
-require.alias("tower-observable-array/index.js", "tower-list-directive/deps/tower-observable-array/index.js");
-require.alias("tower-emitter/index.js", "tower-observable-array/deps/tower-emitter/index.js");
-require.alias("tower-emitter/index.js", "tower-observable-array/deps/tower-emitter/index.js");
-require.alias("component-indexof/index.js", "tower-emitter/deps/indexof/index.js");
-
-require.alias("tower-emitter/index.js", "tower-emitter/index.js");
 require.alias("component-live-css/index.js", "openautomation/deps/live-css/index.js");
 require.alias("component-live-css/index.js", "live-css/index.js");
 require.alias("visionmedia-superagent/lib/client.js", "component-live-css/deps/superagent/lib/client.js");
@@ -16687,14 +11874,13 @@ require.alias("component-emitter/index.js", "visionmedia-superagent/deps/emitter
 require.alias("component-reduce/index.js", "visionmedia-superagent/deps/reduce/index.js");
 
 require.alias("visionmedia-superagent/lib/client.js", "visionmedia-superagent/index.js");
-require.alias("visionmedia-debug/index.js", "component-live-css/deps/debug/index.js");
 require.alias("visionmedia-debug/debug.js", "component-live-css/deps/debug/debug.js");
-
+require.alias("visionmedia-debug/debug.js", "component-live-css/deps/debug/index.js");
+require.alias("visionmedia-debug/debug.js", "visionmedia-debug/index.js");
 require.alias("component-each/index.js", "component-live-css/deps/each/index.js");
 require.alias("component-to-function/index.js", "component-each/deps/to-function/index.js");
 require.alias("component-props/index.js", "component-to-function/deps/props/index.js");
-require.alias("component-props/index.js", "component-to-function/deps/props/index.js");
-require.alias("component-props/index.js", "component-props/index.js");
+
 require.alias("component-type/index.js", "component-each/deps/type/index.js");
 
 require.alias("component-url/index.js", "component-live-css/deps/url/index.js");

@@ -33,7 +33,7 @@ app.use(compress({
 }));
 app.use(serve('public/'))
 app.use(route.get('/', index));
-app.use(route.post('/actions', actions.create));
+app.use(route.post('/run', actions.create));
 
 /**
  * Start.

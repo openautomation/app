@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" ng-app="App">
   <head>
     <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -8,44 +8,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
     <link href="/stylesheets/build.css" rel="stylesheet"></link>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.12/angular.js"></script>
   </head>
   <body>
-    <div class="container">
+    <div class="container" ng-controller="StepsController">
       <div class="sidebar">
         <div class="sidebar-content">
-          <ul class="steps">
+          <!-- list of steps -->
+          <ul class="steps" ng-show="'steps' == view">
             <i class="timeline"></i>
-            <li class="step" on-click="edit()">
+            <li ng-repeat="step in steps" class="step" ng-click="showStep(step)">
               <i class="first fa fa-circle"></i>
-              <div class="step-title">Add sample to each microplate well</div>
-              <span class="step-details">Liquid A, 10ml each well</span>
+              <div class="step-title">{{step.title}}</div>
+              <div class="step-details">
+                <span class="step-detail" ng-repeat="variable in step.variables">{{variable.value}}</span>
+              </div>
               <i class="last fa fa-adjust"></i>
             </li>
-            <li class="step">
-              <i class="first fa fa-circle"></i>
-              <div class="step-title">Incubate microplate</div>
-              <span class="step-details">37C, 60min</span>
-            </li>
-            <li class="step">
-              <i class="first fa fa-circle"></i>
-              <div class="step-title">Discard solution in each well</div>
-              <span class="step-details">Decant</span>
-            </li>
-            <li class="step">
-              <i class="first fa fa-circle"></i>
-              <div class="step-title">Wash each microplate well</div>
-              <span class="step-details">4x</span>
-            </li>
-            <li class="step">
-              <i class="first fa fa-circle"></i>
-              <div class="step-title">Add sample to wells</div>
-              <div class="step-details">Liquid A</div>
-              <div class="step-details">10ml each well</div>
-            </li>
-            <!--<li class="step" data-each="step in steps"><span data-text="step"></span></li>-->
           </ul>
 
-          <a class="sidebar-button" on-click="run()">Run</a>
+          <!-- active step -->
+          <ul class="steps" ng-show="'step' == view">
+            <li class="step" ng-click="showSteps()">
+              <div class="step-title">{{activeStep.title}}</div>
+            </li>
+            <li class="step" ng-repeat="variable in activeStep.variables" ng-click="showVariable(variable)">
+              <label class="input-label">{{variable.name}}</label>
+              <input
+                ng-model="variable.value" 
+                class="input" 
+                type="text" 
+                pattern="\d*">
+            </li>
+          </ul>
+
+          <!-- active variable we're editing -->
+          <div ng-switch="activeVariable.type" ng-show="'variable' == view">
+            <ul class="steps" ng-switch-when="array">
+              <li class="step" ng-repeat="liquid in liquids" ng-click="selectValue(liquid)">
+                <div class="step-title">{{liquid}}</div>
+              </li>
+            </ul>
+
+            <div class="steps" ng-switch-when="microplate">
+              <li class="step" ng-click="selectWells()">Wells SVG!</li>
+            </div>
+          </div>
+
+          <!-- run experiment! -->
+          <a class="sidebar-button" ng-click="run()">Run</a>
         </div>
       </div>
       <div class="content">
