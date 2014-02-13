@@ -13,6 +13,7 @@
   <body>
     <div class="container" ng-controller="StepsController">
       <div class="sidebar">
+        <div class="sidebar-background"></div>
         <div class="sidebar-content">
           <!-- list of steps -->
           <ul class="steps" ng-show="'steps' == view">
@@ -23,7 +24,6 @@
               <div class="step-details">
                 <span class="step-detail" ng-repeat="variable in step.variables">{{variable.value}}</span>
               </div>
-              <i class="last fa fa-adjust"></i>
             </li>
           </ul>
 
@@ -56,7 +56,7 @@
           </div>
 
           <!-- run experiment! -->
-          <a class="sidebar-button" ng-click="run()">Run</a>
+          <a class="sidebar-button" ng-click="run()" href="#">Run</a>
         </div>
       </div>
       <div class="content">
