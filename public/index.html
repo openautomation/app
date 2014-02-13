@@ -20,9 +20,9 @@
             <i class="timeline"></i>
             <li ng-repeat="step in steps" class="step" ng-click="showStep(step)">
               <i class="first fa fa-circle"></i>
-              <div class="step-title">{{step.title}}</div>
+              <div class="step-title" ng-bind="step.title"></div>
               <div class="step-details">
-                <span class="step-detail" ng-repeat="variable in step.variables">{{variable.value}}</span>
+                <span class="step-detail" ng-repeat="variable in step.variables" ng-bind="variable.value"></span>
               </div>
             </li>
           </ul>
@@ -30,10 +30,10 @@
           <!-- active step -->
           <ul class="steps" ng-show="'step' == view">
             <li class="step" ng-click="showSteps()">
-              <div class="step-title">{{activeStep.title}}</div>
+              <div class="step-title" ng-bind="activeStep.title"></div>
             </li>
             <li class="step" ng-repeat="variable in activeStep.variables" ng-click="showVariable(variable)">
-              <label class="input-label">{{variable.name}}</label>
+              <label class="input-label" ng-bind="variable.name"></label>
               <input
                 ng-model="variable.value" 
                 class="input" 
@@ -46,7 +46,7 @@
           <div ng-switch="activeVariable.type" ng-show="'variable' == view">
             <ul class="steps" ng-switch-when="array">
               <li class="step" ng-repeat="liquid in liquids" ng-click="selectValue(liquid)">
-                <div class="step-title">{{liquid}}</div>
+                <div class="step-title" ng-bind="liquid"></div>
               </li>
             </ul>
 
