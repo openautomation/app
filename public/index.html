@@ -51,12 +51,15 @@
             </ul>
 
             <div class="steps" ng-switch-when="microplate">
-              <li class="step" ng-click="selectWells()">Wells SVG!</li>
+              <ol class="microplate">
+                <li class="microplate-well" ng-repeat="well in wells" ng-click="selectWell(well)" ng-class="{selected: well.selected}">
+              </ol>
+              <a class="sidebar-button" ng-click="selectWells()">Save</a>
             </div>
           </div>
 
           <!-- run experiment! -->
-          <a class="sidebar-button" ng-click="run()">Run</a>
+          <a class="sidebar-button absolute" ng-click="run()" ng-show="'steps' == view">Run</a>
         </div>
       </div>
       <div class="content">

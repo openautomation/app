@@ -38,13 +38,18 @@ require('live-css').start();
 app.controller('StepsController', function ($scope){
   $scope.view = 'steps';
 
+  var wells = new Array(96);
+  for (var i = 0, n = wells.length; i < n; i++) {
+    wells[i] = { selected: i < 5 };
+  }
+
   $scope.steps = [
     { title: 'Add sample',// to each microplate well',
       icon: 'liquid',
       variables: [
         { name: 'Liquid', value: 'Liquid A', type: 'array' },
         { name: 'Volume (ml)', value: 10, type: 'number' },
-        { name: 'Wells', value: '1-5', type: 'microplate' } ] },
+        { name: 'Wells', value: '5', type: 'microplate', data: wells } ] },
     { title: 'Incubate microplate',
       icon: 'fridge',
       variables: [
@@ -56,12 +61,23 @@ app.controller('StepsController', function ($scope){
         { name: 'Times', value: 4, type: 'number' } ] }
   ];
 
+  $scope.wells = wells;
+
   $scope.liquids = [
     'Liquid A',
     'Liquid B'
   ];
 
+  $scope.selectWell = function(well){
+    well.selected = !well.selected;
+  };
+
   $scope.selectWells = function(){
+    var count = 0;
+    for (var i = 0, n = wells.length; i < n; i++) {
+      if (wells[i].selected) count++;
+    }
+    $scope.activeVariable.value = count;
     $scope.view = 'step';
     $scope.activeVariable = null;
   };

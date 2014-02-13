@@ -246,6 +246,28 @@ a {
   z-index: 1;
 }
 
+.microplate {
+  list-style: none;
+  margin: 0;
+  padding: 0px 8px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid hsl(0, 0%, 83%);
+}
+
+.microplate-well {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  margin: 5px 4px 0px 4px;
+  border-radius: 15px;
+  background: inherit;
+  border: 1px solid hsl(0, 0%, 56%);
+}
+
+.microplate-well.selected {
+  background: hsl(0, 0%, 56%);
+}
+
 .step i {
   color: hsl(0, 0%, 30%);
   font-size: 16px;
@@ -298,10 +320,12 @@ a {
 
 .sidebar-button {
   display: block;
-  position: absolute;
   bottom: 10px;
   left: 0px;
   right: 0px;
+}
+.sidebar-button.absolute {
+  position: absolute;
 }
 
 .header {
