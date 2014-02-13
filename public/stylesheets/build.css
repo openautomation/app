@@ -425,6 +425,7 @@ th {
 
 
 
+
 /*@font-face {
   font-family: "Helvetica Neue Thin";
   src: url("/fonts/helvetica-neue-thin.ttf");
@@ -647,6 +648,10 @@ input {
 
 .step:hover, .step:active {
   /*background: hsl(0, 0%, 81%);*/
+}
+
+a {
+  cursor: pointer;
 }
 
 .step-title {

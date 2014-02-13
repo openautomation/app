@@ -222,6 +222,10 @@ input {
   /*background: hsl(0, 0%, 81%);*/
 }
 
+a {
+  cursor: pointer;
+}
+
 .step-title {
   font-size: 16px;
 }

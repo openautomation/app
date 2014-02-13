@@ -18,7 +18,8 @@
     "tower/query": "*",
     "tower/adapter": "*",
     "necolas/normalize.css": "*",
-    "component/live-css": "*"
+    "component/live-css": "*",
+    "ftlabs/fastclick": "*"
   },
   "development": {
     "component/live-css": "*"

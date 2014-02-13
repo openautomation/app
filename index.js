@@ -13,6 +13,7 @@ var transformBounds = require('transform-bounds');
 var events = require('event');
 var agent = require('superagent');
 var SVG = require('svg.js').SVG;
+var FastClick = require('fastclick').FastClick;
 var drawing = SVG('sprites').fixSubPixelOffset();
 
 /**
@@ -20,6 +21,9 @@ var drawing = SVG('sprites').fixSubPixelOffset();
  */
 
 var app = angular.module('App', []);
+app.run(function(){
+  FastClick.attach(document.body);
+});
 
 /**
  * Lab equipment.
