@@ -721,6 +721,9 @@ a {
 .faucet-icon {
   background-image: url(/icons/faucet.png);
 }
+.microscope-icon {
+  background-image: url(/icons/microscope.png);
+}
 
 .step i.first {
   left: auto;

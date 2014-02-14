@@ -58,7 +58,11 @@ app.controller('StepsController', function ($scope){
     { title: 'Wash microplate',
       icon: 'faucet',
       variables: [
-        { name: 'Times', value: 4, type: 'number' } ] }
+        { name: 'Times', value: 4, type: 'number' } ] },
+    { title: 'View in microscope',
+      icon: 'microscope',
+      variables: [
+        { name: 'Zoom level', value: 400, type: 'number' } ] }
   ];
 
   $scope.wells = wells;
