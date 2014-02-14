@@ -59,7 +59,7 @@ app.controller('StepsController', function ($scope){
       icon: 'faucet',
       variables: [
         { name: 'Times', value: 4, type: 'number' } ] },
-    { title: 'View in microscope',
+    { title: 'Microscopy',
       icon: 'microscope',
       variables: [
         { name: 'Zoom level', value: 400, type: 'number' } ] }
