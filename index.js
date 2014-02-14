@@ -62,7 +62,11 @@ app.controller('StepsController', function ($scope){
     { title: 'Microscopy',
       icon: 'microscope',
       variables: [
-        { name: 'Zoom level', value: 400, type: 'number' } ] }
+        { name: 'Zoom level', value: 400, type: 'number' } ] },
+    { title: 'Shake',
+      icon: 'shaker',
+      variables: [
+        { name: 'Intensity', value: 20, type: 'number' } ] }
   ];
 
   $scope.wells = wells;

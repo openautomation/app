@@ -11452,7 +11452,11 @@ app.controller('StepsController', function ($scope){\n\
     { title: 'Microscopy',\n\
       icon: 'microscope',\n\
       variables: [\n\
-        { name: 'Zoom level', value: 400, type: 'number' } ] }\n\
+        { name: 'Zoom level', value: 400, type: 'number' } ] },\n\
+    { title: 'Shake',\n\
+      icon: 'shaker',\n\
+      variables: [\n\
+        { name: 'Intensity', value: 20, type: 'number' } ] }\n\
   ];\n\
 \n\
   $scope.wells = wells;\n\

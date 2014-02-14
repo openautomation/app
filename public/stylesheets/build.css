@@ -724,6 +724,9 @@ a {
 .microscope-icon {
   background-image: url(/icons/microscope.png);
 }
+.shaker-icon {
+  background-image: url(/icons/shaker.png);
+}
 
 .step i.first {
   left: auto;
