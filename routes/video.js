@@ -21,7 +21,7 @@ exports.stream = function *(next){
   // ffmpeg.stdout.on('data', function (data) {
   //   //console.log('ffmpeg stdout: ' + data);
   // });
-  var opts = '-s 640x480 -f video4linux2 -i /dev/video0 -f mp4 -b 800k -r 30 -vf scale=1024:768 -'.split(' ');
+  var opts = '-s 640x480 -f video4linux2 -i /dev/video0 -re -f webm -b 800k -r 30 -vf scale=1024:768 -'.split(' ');
   var ffmpeg = spawn("ffmpeg", opts
       // "-f", "video4linux2",
       // "-i", "/dev/video0",
