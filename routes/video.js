@@ -47,10 +47,11 @@ exports.stream = function *(next){
   //this.body = ffmpeg.stdout;
   var stream = this.body = new PassThrough();
   setImmediate(function(){
-    stream.write('hello');
-    stream.write(' ');
-    stream.write('world');
-    stream.end();
+    // stream.write('hello');
+    // stream.write(' ');
+    // stream.write('world');
+    // stream.end();
+    ffmpeg.stdout.pipe(stream);
   });
   // // Kill the subprocesses when client disconnects
   // res.on("close",function(){
