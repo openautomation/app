@@ -6,9 +6,10 @@
 var spawn = require('child_process').spawn;
 var PassThrough = require('stream').PassThrough;
 
+// https://github.com/schaermu/node-fluent-ffmpeg
 exports.stream = function *(next){
   //this.body = yield render('index.html', { title: 'iorobotics' });
-  this.res.writeHead(200, { 'Content-Type': 'video/webm' });
+  this.res.writeHead(200, { 'Content-Type': 'video/webm', 'Connection': 'keep-alive' });
   // start video streaming to local websocket
   // var ffmpeg_args = '-s 640x480 -f video4linux2 -i /dev/video0 -f mp4 -b 800k -r 30 -vf scale=1024:768 http://localhost:8082/password/1024/768/';
   // var ffmpeg = spawn('ffmpeg', ffmpeg_args.split(' '));
@@ -45,14 +46,18 @@ exports.stream = function *(next){
   );
   // Pipe the video output to the client response
   //this.body = ffmpeg.stdout;
-  var stream = this.body = new PassThrough();
+  //var stream = this.body = new PassThrough();
   // setImmediate(function(){
   //   // stream.write('hello');
   //   // stream.write(' ');
   //   // stream.write('world');
   //   // stream.end();
   // });
-  ffmpeg.stdout.pipe(stream);
+  //ffmpeg.stdout.pipe(stream);
+  var res = this.res;
+  ffmpeg.stdout.on('data', function(data){
+    res.write(data);
+  });
   ffmpeg.stderr.on('data', function(data){
     console.log('error:', String(data));
   });

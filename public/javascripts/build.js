@@ -13644,7 +13644,7 @@ var SVG = require('svg.js').SVG;\n\
 var FastClick = require('fastclick').FastClick;\n\
 var drawing = SVG('sprites').fixSubPixelOffset();\n\
 require('./lib/jsmpg');\n\
-console.log('after');\n\
+\n\
 /**\n\
  * Angular stuff.\n\
  */\n\

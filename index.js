@@ -16,7 +16,7 @@ var SVG = require('svg.js').SVG;
 var FastClick = require('fastclick').FastClick;
 var drawing = SVG('sprites').fixSubPixelOffset();
 require('./lib/jsmpg');
-console.log('after');
+
 /**
  * Angular stuff.
  */
