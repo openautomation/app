@@ -11262,6 +11262,7 @@ jsmpeg.prototype.load = function( url ) {\n\
 \t\t}\n\
 \t};\n\
 \trequest.onprogress = this.updateLoader.bind(this);\n\
+\tconsole.log('GET', url);\n\
 \n\
 \trequest.open('GET', url);\n\
 \trequest.responseType = \"arraybuffer\";\n\
@@ -13762,7 +13763,7 @@ canvas.style.zIndex = 0;\n\
 \n\
 // Setup the WebSocket connection and start the player\n\
 var client = new WebSocket('ws://192.168.34.168:8084/');\t\t//TODO: get local/external IP address\n\
-console.log('created websocket client');\n\
+console.log('created websocket client', client instanceof WebSocket);\n\
 var player = new jsmpeg(client, {canvas:canvas});\n\
 \n\
 /**\n\
