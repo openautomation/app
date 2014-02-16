@@ -4,8 +4,9 @@
  */
 
 var spawn = require('child_process').spawn;
+var PassThrough = require('stream').PassThrough;
 
-exports.stream = function(){
+exports.stream = function *(next){
   //this.body = yield render('index.html', { title: 'iorobotics' });
 
   // start video streaming to local websocket
@@ -43,7 +44,14 @@ exports.stream = function(){
       "-"                      // Output to STDOUT
   ]);
   // Pipe the video output to the client response
-  this.body = ffmpeg.stdout;
+  //this.body = ffmpeg.stdout;
+  var stream = this.body = new PassThrough();
+  setImmediate(function(){
+    stream.write('hello');
+    stream.write(' ');
+    stream.write('world');
+    stream.end();
+  });
   // // Kill the subprocesses when client disconnects
   // res.on("close",function(){
   //   glxgears.kill();

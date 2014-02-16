@@ -11,7 +11,7 @@ var favicon = require('koa-favicon');
 var compress = require('koa-compress');
 var index = require('./routes');
 var actions = require('./routes/action');
-var actions = require('./routes/video');
+var video = require('./routes/video');
 var spawn = require('child_process').spawn;
 
 /**
@@ -42,7 +42,7 @@ app.use(route.get('/video-stream.mp4', video.stream));
  * Video streaming to client.
  */
 
-require('./server/video-stream-server.js');
+//require('./server/video-stream-server.js');
 
 //start video streaming to local websocket
 var ffmpeg_args = '-s 640x480 -f video4linux2 -i /dev/video0 -f mpeg1video -b 800k -r 30 -vf scale=1024:768 http://localhost:8082/password/1024/768/';
