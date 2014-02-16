@@ -46,13 +46,13 @@ exports.stream = function *(next){
   // Pipe the video output to the client response
   //this.body = ffmpeg.stdout;
   var stream = this.body = new PassThrough();
-  setImmediate(function(){
-    // stream.write('hello');
-    // stream.write(' ');
-    // stream.write('world');
-    // stream.end();
-    ffmpeg.stdout.pipe(stream);
-  });
+  // setImmediate(function(){
+  //   // stream.write('hello');
+  //   // stream.write(' ');
+  //   // stream.write('world');
+  //   // stream.end();
+  // });
+  ffmpeg.stdout.pipe(stream);
   // // Kill the subprocesses when client disconnects
   // res.on("close",function(){
   //   glxgears.kill();
