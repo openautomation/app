@@ -53,6 +53,9 @@ exports.stream = function *(next){
   //   // stream.end();
   // });
   ffmpeg.stdout.pipe(stream);
+  ffmpeg.stderr.on('data', function(data){
+    console.log('error:', String(data));
+  });
   // // Kill the subprocesses when client disconnects
   // res.on("close",function(){
   //   glxgears.kill();
