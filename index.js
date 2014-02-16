@@ -135,8 +135,8 @@ canvas.style.zIndex = 0;
 
 // Setup the WebSocket connection and start the player
 var client = new WebSocket('ws://192.168.34.168:8084/');		//TODO: get local/external IP address
-console.log('created websocket client', client instanceof WebSocket);
-var player = new jsmpeg(client, {canvas:canvas});
+//console.log('created websocket client', client instanceof WebSocket);
+//var player = new jsmpeg(client, {canvas:canvas});
 
 /**
  * Hardcoded lab box dimensions.

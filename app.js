@@ -36,7 +36,7 @@ app.use(compress({
 app.use(serve('public/'))
 app.use(route.get('/', index));
 app.use(route.post('/run', actions.create));
-app.use(route.get('/video-stream.mp4', video.stream));
+app.use(route.get('/video-stream.webm', video.stream));
 
 /**
  * Video streaming to client.
