@@ -93,10 +93,10 @@ class XYZState:
 		#create gcode string and update position list for each argument that isn't None
 		for i in range(3):
 			if pos[i] is not None:
-				if pos[i] < 0 or pos[i] >= self.limits[i]:
-					#error
-					print limits[i] +'=' + pos[i] + ' position outside limit: \n'
-					return
+				#if pos[i] < 0 or pos[i] >= self.limits[i]:
+				#	#error
+				#	print limits[i] +'=' + pos[i] + ' position outside limit: \n'
+				#	return
 				gcode += ' ' + letters[i] + str(pos[i])
 				newpos[i] = pos[i]
 
@@ -156,8 +156,8 @@ class XYZState:
 		self.s.write(gcode)
 		self.s.readline()
 
-def defaultXYZ(port='COM3', baud=9600, limits=[700, 500, 100]):
-	xyz = XYZState(limits)
+def defaultXYZ(port='/dev/ttyACM0', baud=9600):#, limits=[700, 500, 100]):
+	xyz = XYZState()
 	xyz.startup(port, baud)
 	return xyz
 
@@ -468,7 +468,7 @@ xyz.move_to(z=tipz)
 xyz.move_to(dest)
 liquid.disp()
 """
-
+"""
 import rospy
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist
@@ -484,4 +484,4 @@ def init_ros_listener():
 	rospy.spin()
 
 init_ros_listener()
-
+"""
