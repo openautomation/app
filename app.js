@@ -11,6 +11,7 @@ var favicon = require('koa-favicon');
 var compress = require('koa-compress');
 var index = require('./routes');
 var actions = require('./routes/action');
+var spawn = require('child_process').spawn;
 
 /**
  * App.
@@ -34,6 +35,26 @@ app.use(compress({
 app.use(serve('public/'))
 app.use(route.get('/', index));
 app.use(route.post('/run', actions.create));
+
+/**
+ * Video streaming to client.
+ */
+
+require('./server/video-stream-server.js');
+
+//start video streaming to local websocket
+ffmpeg_args = '-s 640x480 -f video4linux2 -i /dev/video0 -f mpeg1video -b 800k -r 30 http://localhost:8082/password/640/480/';
+ffmpeg = spawn('ffmpeg', ffmpeg_args.split(' '));
+ffmpeg.on('close', function (code) {
+  console.log('ffmpeg video streaming process exited with code ' + code);
+});
+/*ffmpeg.stderr.on('data', function (data) {
+  console.log('ffmpeg stderr: ' + data);
+});
+/*ffmpeg.stdout.on('data', function (data) {
+  console.log('ffmpeg stdout: ' + data);
+});*/
+
 
 /**
  * Start.
