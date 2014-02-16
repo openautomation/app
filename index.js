@@ -15,7 +15,7 @@ var agent = require('superagent');
 var SVG = require('svg.js').SVG;
 var FastClick = require('fastclick').FastClick;
 var drawing = SVG('sprites').fixSubPixelOffset();
-require('./public/javascripts/jsmpg');
+require('./lib/jsmpg');
 
 /**
  * Angular stuff.
@@ -122,6 +122,8 @@ app.controller('StepsController', function ($scope){
 //var video = document.getElementById('webcam');
 var canvas = document.getElementById('canvas');
 canvas.style.zIndex = 0;
+//canvas.width = document.body.clientWidth;
+//canvas.height = document.body.clientHeight;
 
 // Setup the WebSocket connection and start the player
 var client = new WebSocket('ws://98.234.56.154:8084/');		//TODO: get local/external IP address
