@@ -48,12 +48,12 @@ var ffmpeg = spawn('ffmpeg', ffmpeg_args.split(' '));
 ffmpeg.on('close', function (code) {
   console.log('ffmpeg video streaming process exited with code ' + code);
 });
-ffmpeg.stderr.on('data', function (data) {
+/*ffmpeg.stderr.on('data', function (data) {
   console.log('ffmpeg stderr: ' + data);
 });
 ffmpeg.stdout.on('data', function (data) {
   console.log('ffmpeg stdout: ' + data);
-});
+});*/
 
 
 /**
