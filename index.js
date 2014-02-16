@@ -15,6 +15,7 @@ var agent = require('superagent');
 var SVG = require('svg.js').SVG;
 var FastClick = require('fastclick').FastClick;
 var drawing = SVG('sprites').fixSubPixelOffset();
+require('./lib/jsmpg');
 
 /**
  * Angular stuff.
@@ -126,9 +127,15 @@ app.controller('StepsController', function ($scope){
  * Canvas.
  */
 
-var video = document.getElementById('webcam');
+//var video = document.getElementById('webcam');
 var canvas = document.getElementById('canvas');
 canvas.style.zIndex = 0;
+//canvas.width = document.body.clientWidth;
+//canvas.height = document.body.clientHeight;
+
+// Setup the WebSocket connection and start the player
+var client = new WebSocket('ws://98.234.56.154:8084/');		//TODO: get local/external IP address
+var player = new jsmpeg(client, {canvas:canvas});
 
 /**
  * Hardcoded lab box dimensions.
@@ -150,9 +157,9 @@ events.bind(window, 'clicks', function(e){
     document.querySelector('.viewport').style.display = 'none';
     document.querySelector('.editor').style.display = 'none';
     //canvas.style.webkitFilter = '';
-    video.play();
+    //video.play();
   } else {
-    video.pause();
+    //video.pause();
     //document.querySelector('.snapshot').style.backgroundImage = 'url(' + canvas.toDataURL() + ');';
     document.querySelector('.snapshot').src = canvas.toDataURL('image/webp', 0.001);
     document.querySelector('.viewport').style.display = 'block';
@@ -184,7 +191,7 @@ function sendMove(remote) {
     });
 }
 
-navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+/*navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
 // http://inspirit.github.io/jsfeat/js/compatibility.js
 navigator.getUserMedia({ video: true }, function(stream){
@@ -198,10 +205,10 @@ navigator.getUserMedia({ video: true }, function(stream){
   setTimeout(start, 500);
 }, function(){
   console.log(arguments);
-});
+});*/
 
 function start() {
-  video.play();
+  //video.play();
   demo_app();
   requestAnimationFrame(tick);
   return;
@@ -216,7 +223,7 @@ function start() {
 
   var liquid = new LiquidContainer(drawing);
 }
-
+/*
 function success(stream) {
   try {
     video.src = webkitURL.createObjectURL(stream);
@@ -231,6 +238,7 @@ function failure(err) {
   $('#no_rtc').html('<h4>WebRTC not available.</h4>');
   $('#no_rtc').show();
 }
+*/
 
 var gui,options,ctx,canvasWidth,canvasHeight;
 var img_u8;
@@ -250,7 +258,7 @@ var imageData;
 function tick() {
   requestAnimationFrame(tick);
 
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+  /*if (video.readyState === video.HAVE_ENOUGH_DATA) {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     return;
@@ -271,5 +279,5 @@ function tick() {
     }
     
     ctx.putImageData(imageData, 0, 0);
-  }
+  }*/
 }

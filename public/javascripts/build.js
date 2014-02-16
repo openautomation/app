@@ -10990,6 +10990,2243 @@ if (typeof define !== 'undefined' && define.amd) {\n\
 }\n\
 //@ sourceURL=ftlabs-fastclick/lib/fastclick.js"
 ));
+require.register("openautomation/lib/jsmpg.js", Function("exports, require, module",
+"(function(window){ \"use strict\";\n\
+\n\
+// jsmpeg by Dominic Szablewski - phoboslab.org, github.com/phoboslab\n\
+//\n\
+// Consider this to be under MIT license. It's largely based an an Open Source\n\
+// Decoder for Java under GPL, while I looked at another Decoder from Nokia \n\
+// (under no particular license?) for certain aspects.\n\
+// I'm not sure if this work is \"derivative\" enough to have a different license\n\
+// but then again, who still cares about MPEG1?\n\
+//\n\
+// Based on \"Java MPEG-1 Video Decoder and Player\" by Korandi Zoltan:\n\
+// http://sourceforge.net/projects/javampeg1video/\n\
+//\n\
+// Inspired by \"MPEG Decoder in Java ME\" by Nokia:\n\
+// http://www.developer.nokia.com/Community/Wiki/MPEG_decoder_in_Java_ME\n\
+\n\
+\n\
+var requestAnimFrame = (function(){\n\
+\treturn window.requestAnimationFrame ||\n\
+\t\twindow.webkitRequestAnimationFrame ||\n\
+\t\twindow.mozRequestAnimationFrame ||\n\
+\t\tfunction( callback ){\n\
+\t\t\twindow.setTimeout(callback, 1000 / 60);\n\
+\t\t};\n\
+})();\n\
+\t\t\n\
+var jsmpeg = window.jsmpeg = function( url, opts ) {\n\
+\topts = opts || {};\n\
+\tthis.benchmark = !!opts.benchmark;\n\
+\tthis.canvas = opts.canvas || document.createElement('canvas');\n\
+\tthis.autoplay = !!opts.autoplay;\n\
+\tthis.loop = !!opts.loop;\n\
+\tthis.externalLoadCallback = opts.onload || null;\n\
+\tthis.externalDecodeCallback = opts.ondecodeframe || null;\n\
+\tthis.bwFilter = opts.bwFilter || false;\n\
+\n\
+\tthis.customIntraQuantMatrix = new Uint8Array(64);\n\
+\tthis.customNonIntraQuantMatrix = new Uint8Array(64);\n\
+\tthis.blockData = new Int32Array(64);\n\
+\n\
+\tthis.canvasContext = this.canvas.getContext('2d');\n\
+\n\
+\tif( url instanceof WebSocket ) {\n\
+\t\tthis.client = url;\n\
+\t\tthis.client.onopen = this.initSocketClient.bind(this);\n\
+\t} \n\
+\telse {\n\
+\t\tthis.load(url);\n\
+\t}\n\
+};\n\
+\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Streaming over WebSockets\n\
+\n\
+jsmpeg.prototype.waitForIntraFrame = true;\n\
+jsmpeg.prototype.socketBufferSize = 512 * 1024; // 512kb each\n\
+jsmpeg.prototype.onlostconnection = null;\n\
+\n\
+jsmpeg.prototype.initSocketClient = function( client ) {\n\
+\tthis.buffer = new BitReader(new ArrayBuffer(this.socketBufferSize));\n\
+\n\
+\tthis.nextPictureBuffer = new BitReader(new ArrayBuffer(this.socketBufferSize));\n\
+\tthis.nextPictureBuffer.writePos = 0;\n\
+\tthis.nextPictureBuffer.chunkBegin = 0;\n\
+\tthis.nextPictureBuffer.lastWriteBeforeWrap = 0;\n\
+\n\
+\tthis.client.binaryType = 'arraybuffer';\n\
+\tthis.client.onmessage = this.receiveSocketMessage.bind(this);\n\
+};\n\
+\n\
+jsmpeg.prototype.decodeSocketHeader = function( data ) {\n\
+\t// Custom header sent to all newly connected clients when streaming\n\
+\t// over websockets:\n\
+\t// struct { char magic[4] = \"jsmp\"; unsigned short width, height; };\n\
+\tif( \n\
+\t\tdata[0] == SOCKET_MAGIC_BYTES.charCodeAt(0) && \n\
+\t\tdata[1] == SOCKET_MAGIC_BYTES.charCodeAt(1) && \n\
+\t\tdata[2] == SOCKET_MAGIC_BYTES.charCodeAt(2) && \n\
+\t\tdata[3] == SOCKET_MAGIC_BYTES.charCodeAt(3)\n\
+\t) {\n\
+\t\tthis.width = (data[4] * 256 + data[5]);\n\
+\t\tthis.height = (data[6] * 256 + data[7]);\n\
+\t\tthis.initBuffers();\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.receiveSocketMessage = function( event ) {\n\
+\tvar messageData = new Uint8Array(event.data);\n\
+\n\
+\tif( !this.sequenceStarted ) {\n\
+\t\tthis.decodeSocketHeader(messageData);\n\
+\t}\n\
+\n\
+\tvar current = this.buffer;\n\
+\tvar next = this.nextPictureBuffer;\n\
+\n\
+\tif( next.writePos + messageData.length > next.length ) {\n\
+\t\tnext.lastWriteBeforeWrap = next.writePos;\n\
+\t\tnext.writePos = 0;\n\
+\t\tnext.index = 0;\n\
+\t}\n\
+\t\n\
+\tnext.bytes.set( messageData, next.writePos );\n\
+\tnext.writePos += messageData.length;\n\
+\n\
+\tvar startCode = 0;\n\
+\twhile( true ) {\n\
+\t\tstartCode = next.findNextMPEGStartCode();\n\
+\t\tif( \n\
+\t\t\tstartCode == BitReader.NOT_FOUND ||\n\
+\t\t\t((next.index >> 3) > next.writePos)\n\
+\t\t) {\n\
+\t\t\t// We reached the end with no picture found yet; move back a few bytes\n\
+\t\t\t// in case we are at the beginning of a start code and exit.\n\
+\t\t\tnext.index = Math.max((next.writePos-3), 0) << 3;\n\
+\t\t\treturn;\n\
+\t\t}\n\
+\t\telse if( startCode == START_PICTURE ) {\n\
+\t\t\tbreak;\n\
+\t\t}\n\
+\t}\n\
+\n\
+\t// If we are still here, we found the next picture start code!\n\
+\n\
+\t\n\
+\t// Skip picture decoding until we find the first intra frame?\n\
+\tif( this.waitForIntraFrame ) {\n\
+\t\tnext.advance(10); // skip temporalReference\n\
+\t\tif( next.getBits(3) == PICTURE_TYPE_I ) {\n\
+\t\t\tthis.waitForIntraFrame = false;\n\
+\t\t\tnext.chunkBegin = (next.index-13) >> 3;\n\
+\t\t}\n\
+\t\treturn;\n\
+\t}\n\
+\n\
+\t// Last picture hasn't been decoded yet? Decode now but skip output\n\
+\t// before scheduling the next one\n\
+\tif( !this.currentPictureDecoded ) {\n\
+\t\tthis.decodePicture(DECODE_SKIP_OUTPUT);\n\
+\t}\n\
+\n\
+\t\n\
+\t// Copy the picture chunk over to 'this.buffer' and schedule decoding.\n\
+\tvar chunkEnd = ((next.index) >> 3);\n\
+\n\
+\tif( chunkEnd > next.chunkBegin ) {\n\
+\t\t// Just copy the current picture chunk\n\
+\t\tcurrent.bytes.set( next.bytes.subarray(next.chunkBegin, chunkEnd) );\n\
+\t\tcurrent.writePos = chunkEnd - next.chunkBegin;\n\
+\t}\n\
+\telse {\n\
+\t\t// We wrapped the nextPictureBuffer around, so we have to copy the last part\n\
+\t\t// till the end, as well as from 0 to the current writePos\n\
+\t\tcurrent.bytes.set( next.bytes.subarray(next.chunkBegin, next.lastWriteBeforeWrap) );\n\
+\t\tvar written = next.lastWriteBeforeWrap - next.chunkBegin;\n\
+\t\tcurrent.bytes.set( next.bytes.subarray(0, chunkEnd), written );\n\
+\t\tcurrent.writePos = chunkEnd + written;\n\
+\t}\n\
+\n\
+\tcurrent.index = 0;\n\
+\tnext.chunkBegin = chunkEnd;\n\
+\n\
+\t// Decode!\n\
+\tthis.currentPictureDecoded = false;\n\
+\trequestAnimFrame( this.scheduleDecoding.bind(this), this.canvas );\n\
+};\n\
+\n\
+jsmpeg.prototype.scheduleDecoding = function() {\n\
+\tthis.decodePicture();\n\
+\tthis.currentPictureDecoded = true;\n\
+};\n\
+\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Recording from WebSockets\n\
+\n\
+jsmpeg.prototype.isRecording = false;\n\
+jsmpeg.prototype.recorderWaitForIntraFrame = false;\n\
+jsmpeg.prototype.recordedFrames = 0;\n\
+jsmpeg.prototype.recordedSize = 0;\n\
+jsmpeg.prototype.didStartRecordingCallback = null;\n\
+\n\
+jsmpeg.prototype.recordBuffers = [];\n\
+\n\
+jsmpeg.prototype.canRecord = function(){\n\
+\treturn (this.client && this.client.readyState == this.client.OPEN);\n\
+};\n\
+\n\
+jsmpeg.prototype.startRecording = function(callback) {\n\
+\tif( !this.canRecord() ) {\n\
+\t\treturn;\n\
+\t}\n\
+\t\n\
+\t// Discard old buffers and set for recording\n\
+\tthis.discardRecordBuffers();\n\
+\tthis.isRecording = true;\n\
+\tthis.recorderWaitForIntraFrame = true;\n\
+\tthis.didStartRecordingCallback = callback || null;\n\
+\n\
+\tthis.recordedFrames = 0;\n\
+\tthis.recordedSize = 0;\n\
+\t\n\
+\t// Fudge a simple Sequence Header for the MPEG file\n\
+\t\n\
+\t// 3 bytes width & height, 12 bits each\n\
+\tvar wh1 = (this.width >> 4),\n\
+\t\twh2 = ((this.width & 0xf) << 4) | (this.height >> 8),\n\
+\t\twh3 = (this.height & 0xff);\n\
+\t\n\
+\tthis.recordBuffers.push(new Uint8Array([\n\
+\t\t0x00, 0x00, 0x01, 0xb3, // Sequence Start Code\n\
+\t\twh1, wh2, wh3, // Width & height\n\
+\t\t0x13, // aspect ratio & framerate\n\
+\t\t0xff, 0xff, 0xe1, 0x58, // Meh. Bitrate and other boring stuff\n\
+\t\t0x00, 0x00, 0x01, 0xb8, 0x00, 0x08, 0x00, // GOP\n\
+\t\t0x00, 0x00, 0x00, 0x01, 0x00 // First Picture Start Code\n\
+\t]));\n\
+};\n\
+\n\
+jsmpeg.prototype.recordFrameFromCurrentBuffer = function() {\n\
+\tif( !this.isRecording ) { return; }\n\
+\t\n\
+\tif( this.recorderWaitForIntraFrame ) {\n\
+\t\t// Not an intra frame? Exit.\n\
+\t\tif( this.pictureCodingType != PICTURE_TYPE_I ) { return; }\n\
+\t\n\
+\t\t// Start recording!\n\
+\t\tthis.recorderWaitForIntraFrame = false;\n\
+\t\tif( this.didStartRecordingCallback ) {\n\
+\t\t\tthis.didStartRecordingCallback( this );\n\
+\t\t}\n\
+\t}\n\
+\t\n\
+\tthis.recordedFrames++;\n\
+\tthis.recordedSize += this.buffer.writePos;\n\
+\t\n\
+\t// Copy the actual subrange for the current picture into a new Buffer\n\
+\tthis.recordBuffers.push(new Uint8Array(this.buffer.bytes.subarray(0, this.buffer.writePos)));\n\
+};\n\
+\n\
+jsmpeg.prototype.discardRecordBuffers = function() {\n\
+\tthis.recordBuffers = [];\n\
+\tthis.recordedFrames = 0;\n\
+};\n\
+\n\
+jsmpeg.prototype.stopRecording = function() {\n\
+\tvar blob = new Blob(this.recordBuffers, {type: 'video/mpeg'});\n\
+\tthis.discardRecordBuffers();\n\
+\tthis.isRecording = false;\n\
+\treturn blob;\n\
+};\n\
+\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Loading via Ajax\n\
+\t\n\
+jsmpeg.prototype.load = function( url ) {\n\
+\tthis.url = url;\n\
+\n\
+\tvar request = new XMLHttpRequest();\n\
+\tvar that = this;\n\
+\trequest.onreadystatechange = function() {\t\t\n\
+\t\tif( request.readyState == request.DONE && request.status == 200 ) {\n\
+\t\t\tthat.loadCallback(request.response);\n\
+\t\t}\n\
+\t};\n\
+\trequest.onprogress = this.updateLoader.bind(this);\n\
+\n\
+\trequest.open('GET', url);\n\
+\trequest.responseType = \"arraybuffer\";\n\
+\trequest.send();\n\
+};\n\
+\n\
+jsmpeg.prototype.updateLoader = function( ev ) {\n\
+\tvar \n\
+\t\tp = ev.loaded / ev.total,\n\
+\t\tw = this.canvas.width,\n\
+\t\th = this.canvas.height,\n\
+\t\tctx = this.canvasContext;\n\
+\n\
+\tctx.fillStyle = '#222';\n\
+\tctx.fillRect(0, 0, w, h);\n\
+\tctx.fillStyle = '#fff';\n\
+\tctx.fillRect(0, h - h*p, w, h*p);\n\
+};\n\
+\t\n\
+jsmpeg.prototype.loadCallback = function(file) {\n\
+\tvar time = Date.now();\n\
+\tthis.buffer = new BitReader(file);\n\
+\t\n\
+\tthis.findStartCode(START_SEQUENCE);\n\
+\tthis.firstSequenceHeader = this.buffer.index;\n\
+\tthis.decodeSequenceHeader();\n\
+\n\
+\t// Load the first frame\n\
+\tthis.nextFrame();\n\
+\t\n\
+\tif( this.autoplay ) {\n\
+\t\tthis.play();\n\
+\t}\n\
+\n\
+\tif( this.externalLoadCallback ) {\n\
+\t\tthis.externalLoadCallback(this);\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.play = function(file) {\n\
+\tif( this.playing ) { return; }\n\
+\tthis.targetTime = Date.now();\n\
+\tthis.playing = true;\n\
+\tthis.scheduleNextFrame();\n\
+};\n\
+\n\
+jsmpeg.prototype.pause = function(file) {\n\
+\tthis.playing = false;\n\
+};\n\
+\n\
+jsmpeg.prototype.stop = function(file) {\n\
+\tif( this.buffer ) {\n\
+\t\tthis.buffer.index = this.firstSequenceHeader;\n\
+\t}\n\
+\tthis.playing = false;\n\
+\tif( this.client ) {\n\
+\t\tthis.client.close();\n\
+\t\tthis.client = null;\n\
+\t}\n\
+};\n\
+\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Utilities\n\
+\n\
+jsmpeg.prototype.readCode = function(codeTable) {\n\
+\tvar state = 0;\n\
+\tdo {\n\
+\t\tstate = codeTable[state + this.buffer.getBits(1)];\n\
+\t} while( state >= 0 && codeTable[state] != 0 );\n\
+\treturn codeTable[state+2];\n\
+};\n\
+\n\
+jsmpeg.prototype.findStartCode = function( code ) {\n\
+\tvar current = 0;\n\
+\twhile( true ) {\n\
+\t\tcurrent = this.buffer.findNextMPEGStartCode();\n\
+\t\tif( current == code || current == BitReader.NOT_FOUND ) {\n\
+\t\t\treturn current;\n\
+\t\t}\n\
+\t}\n\
+\treturn BitReader.NOT_FOUND;\n\
+};\n\
+\n\
+jsmpeg.prototype.fillArray = function(a, value) {\n\
+\tfor( var i = 0, length = a.length; i < length; i++ ) {\n\
+\t\ta[i] = value;\n\
+\t}\n\
+};\n\
+\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Sequence Layer\n\
+\n\
+jsmpeg.prototype.pictureRate = 30;\n\
+jsmpeg.prototype.lateTime = 0;\n\
+jsmpeg.prototype.firstSequenceHeader = 0;\n\
+jsmpeg.prototype.targetTime = 0;\n\
+\n\
+jsmpeg.prototype.nextFrame = function() {\n\
+\tif( !this.buffer ) { return; }\n\
+\twhile(true) {\n\
+\t\tvar code = this.buffer.findNextMPEGStartCode();\n\
+\t\t\n\
+\t\tif( code == START_SEQUENCE ) {\n\
+\t\t\tthis.decodeSequenceHeader();\n\
+\t\t}\n\
+\t\telse if( code == START_PICTURE ) {\n\
+\t\t\tif( this.playing ) {\n\
+\t\t\t\tthis.scheduleNextFrame();\n\
+\t\t\t}\n\
+\t\t\tthis.decodePicture();\n\
+\t\t\treturn this.canvas;\n\
+\t\t}\n\
+\t\telse if( code == BitReader.NOT_FOUND ) {\n\
+\t\t\tthis.stop(); // Jump back to the beginning\n\
+\n\
+\t\t\t// Only loop if we found a sequence header\n\
+\t\t\tif( this.loop && this.sequenceStarted ) {\n\
+\t\t\t\tthis.play();\n\
+\t\t\t}\n\
+\t\t\treturn null;\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\t// ignore (GROUP, USER_DATA, EXTENSION, SLICES...)\n\
+\t\t}\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.scheduleNextFrame = function() {\n\
+\tthis.lateTime = Date.now() - this.targetTime;\n\
+\tvar wait = Math.max(0, (1000/this.pictureRate) - this.lateTime);\n\
+\tthis.targetTime = Date.now() + wait;\n\
+\n\
+\tif( this.benchmark ) {\n\
+\t\tvar now = Date.now();\n\
+\t\tif(!this.benchframe) {\n\
+\t\t\tthis.benchstart = now;\n\
+\t\t\tthis.benchframe = 0;\n\
+\t\t}\n\
+\t\tthis.benchframe++;\n\
+\t\tvar timepassed = now - this.benchstart;\n\
+\t\tif( this.benchframe >= 100 ) {\n\
+\t\t\tthis.benchfps = (this.benchframe / timepassed) * 1000;\n\
+\t\t\tif( console ) {\n\
+\t\t\t\tconsole.log(\"frames per second: \" + this.benchfps);\n\
+\t\t\t}\n\
+\t\t\tthis.benchframe = null;\n\
+\t\t}\n\
+\t\tsetTimeout( this.nextFrame.bind(this), 0);\n\
+\t}\n\
+\telse if( wait < 18) {\n\
+\t\tthis.scheduleAnimation();\n\
+\t}\n\
+\telse {\n\
+\t\tsetTimeout( this.scheduleAnimation.bind(this), wait );\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.scheduleAnimation = function() {\n\
+\trequestAnimFrame( this.nextFrame.bind(this), this.canvas );\n\
+};\n\
+\t\n\
+jsmpeg.prototype.decodeSequenceHeader = function() {\n\
+\tthis.width = this.buffer.getBits(12);\n\
+\tthis.height = this.buffer.getBits(12);\n\
+\tthis.buffer.advance(4); // skip pixel aspect ratio\n\
+\tthis.pictureRate = PICTURE_RATE[this.buffer.getBits(4)];\n\
+\tthis.buffer.advance(18 + 1 + 10 + 1); // skip bitRate, marker, bufferSize and constrained bit\n\
+\n\
+\tthis.initBuffers();\n\
+\n\
+\tif( this.buffer.getBits(1) ) { // load custom intra quant matrix?\n\
+\t\tfor( var i = 0; i < 64; i++ ) {\n\
+\t\t\tthis.customIntraQuantMatrix[ZIG_ZAG[i]] = this.buffer.getBits(8);\n\
+\t\t}\n\
+\t\tthis.intraQuantMatrix = this.customIntraQuantMatrix;\n\
+\t}\n\
+\t\n\
+\tif( this.buffer.getBits(1) ) { // load custom non intra quant matrix?\n\
+\t\tfor( var i = 0; i < 64; i++ ) {\n\
+\t\t\tthis.customNonIntraQuantMatrix[ZIG_ZAG[i]] = this.buffer.getBits(8);\n\
+\t\t}\n\
+\t\tthis.nonIntraQuantMatrix = this.customNonIntraQuantMatrix;\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.initBuffers = function() {\t\n\
+\tthis.intraQuantMatrix = DEFAULT_INTRA_QUANT_MATRIX;\n\
+\tthis.nonIntraQuantMatrix = DEFAULT_NON_INTRA_QUANT_MATRIX;\n\
+\t\n\
+\tthis.mbWidth = (this.width + 15) >> 4;\n\
+\tthis.mbHeight = (this.height + 15) >> 4;\n\
+\tthis.mbSize = this.mbWidth * this.mbHeight;\n\
+\t\n\
+\tthis.codedWidth = this.mbWidth << 4;\n\
+\tthis.codedHeight = this.mbHeight << 4;\n\
+\tthis.codedSize = this.codedWidth * this.codedHeight;\n\
+\t\n\
+\tthis.halfWidth = this.mbWidth << 3;\n\
+\tthis.halfHeight = this.mbHeight << 3;\n\
+\tthis.quarterSize = this.codedSize >> 2;\n\
+\t\n\
+\t// Sequence already started? Don't allocate buffers again\n\
+\tif( this.sequenceStarted ) { return; }\n\
+\tthis.sequenceStarted = true;\n\
+\t\n\
+\t\n\
+\t// Manually clamp values when writing macroblocks for shitty browsers\n\
+\t// that don't support Uint8ClampedArray\n\
+\tvar MaybeClampedUint8Array = window.Uint8ClampedArray || window.Uint8Array;\n\
+\tif( !window.Uint8ClampedArray ) {\n\
+\t\tthis.copyBlockToDestination = this.copyBlockToDestinationClamp;\n\
+\t\tthis.addBlockToDestination = this.addBlockToDestinationClamp;\n\
+\t}\n\
+\t\n\
+\t// Allocated buffers and resize the canvas\n\
+\tthis.currentY = new MaybeClampedUint8Array(this.codedSize);\n\
+\tthis.currentY32 = new Uint32Array(this.currentY.buffer);\n\
+\n\
+\tthis.currentCr = new MaybeClampedUint8Array(this.codedSize >> 2);\n\
+\tthis.currentCr32 = new Uint32Array(this.currentCr.buffer);\n\
+\n\
+\tthis.currentCb = new MaybeClampedUint8Array(this.codedSize >> 2);\n\
+\tthis.currentCb32 = new Uint32Array(this.currentCb.buffer);\n\
+\t\n\
+\n\
+\tthis.forwardY = new MaybeClampedUint8Array(this.codedSize);\n\
+\tthis.forwardY32 = new Uint32Array(this.forwardY.buffer);\n\
+\n\
+\tthis.forwardCr = new MaybeClampedUint8Array(this.codedSize >> 2);\n\
+\tthis.forwardCr32 = new Uint32Array(this.forwardCr.buffer);\n\
+\n\
+\tthis.forwardCb = new MaybeClampedUint8Array(this.codedSize >> 2);\n\
+\tthis.forwardCb32 = new Uint32Array(this.forwardCb.buffer);\n\
+\t\n\
+\tthis.canvas.width = this.width;\n\
+\tthis.canvas.height = this.height;\n\
+\t\n\
+\tthis.currentRGBA = this.canvasContext.getImageData(0, 0, this.width, this.height);\n\
+\n\
+\tif( this.bwFilter ) {\n\
+\t\t// This fails in IE10; don't use the bwFilter if you need to support it.\n\
+\t\tthis.currentRGBA32 = new Uint32Array( this.currentRGBA.data.buffer );\n\
+\t}\n\
+\tthis.fillArray(this.currentRGBA.data, 255);\n\
+};\n\
+\n\
+\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Picture Layer\n\
+\n\
+jsmpeg.prototype.currentY = null;\n\
+jsmpeg.prototype.currentCr = null;\n\
+jsmpeg.prototype.currentCb = null;\n\
+\n\
+jsmpeg.prototype.currentRGBA = null;\n\
+\n\
+jsmpeg.prototype.pictureCodingType = 0;\n\
+\n\
+// Buffers for motion compensation\n\
+jsmpeg.prototype.forwardY = null;\n\
+jsmpeg.prototype.forwardCr = null;\n\
+jsmpeg.prototype.forwardCb = null;\n\
+\n\
+jsmpeg.prototype.fullPelForward = false;\n\
+jsmpeg.prototype.forwardFCode = 0;\n\
+jsmpeg.prototype.forwardRSize = 0;\n\
+jsmpeg.prototype.forwardF = 0;\n\
+\n\
+\n\
+jsmpeg.prototype.decodePicture = function(skipOutput) {\n\
+\tthis.buffer.advance(10); // skip temporalReference\n\
+\tthis.pictureCodingType = this.buffer.getBits(3);\n\
+\tthis.buffer.advance(16); // skip vbv_delay\n\
+\t\n\
+\t// Skip B and D frames or unknown coding type\n\
+\tif( this.pictureCodingType <= 0 || this.pictureCodingType >= PICTURE_TYPE_B ) {\n\
+\t\treturn;\n\
+\t}\n\
+\t\n\
+\t// full_pel_forward, forward_f_code\n\
+\tif( this.pictureCodingType == PICTURE_TYPE_P ) {\n\
+\t\tthis.fullPelForward = this.buffer.getBits(1);\n\
+\t\tthis.forwardFCode = this.buffer.getBits(3);\n\
+\t\tif( this.forwardFCode == 0 ) {\n\
+\t\t\t// Ignore picture with zero forward_f_code\n\
+\t\t\treturn;\n\
+\t\t}\n\
+\t\tthis.forwardRSize = this.forwardFCode - 1;\n\
+\t\tthis.forwardF = 1 << this.forwardRSize;\n\
+\t}\n\
+\t\n\
+\tvar code = 0;\n\
+\tdo {\n\
+\t\tcode = this.buffer.findNextMPEGStartCode();\n\
+\t} while( code == START_EXTENSION || code == START_USER_DATA );\n\
+\t\n\
+\t\n\
+\twhile( code >= START_SLICE_FIRST && code <= START_SLICE_LAST ) {\n\
+\t\tthis.decodeSlice( (code & 0x000000FF) );\n\
+\t\tcode = this.buffer.findNextMPEGStartCode();\n\
+\t}\n\
+\t\n\
+\t// We found the next start code; rewind 32bits and let the main loop handle it.\n\
+\tthis.buffer.rewind(32);\n\
+\n\
+\t// Record this frame, if the recorder wants it\n\
+\tthis.recordFrameFromCurrentBuffer();\n\
+\t\n\
+\t\n\
+\tif( skipOutput != DECODE_SKIP_OUTPUT ) {\n\
+\t\tif( this.bwFilter ) {\n\
+\t\t\tthis.YToRGBA();\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\tthis.YCbCrToRGBA();\t\n\
+\t\t}\n\
+\t\tthis.canvasContext.putImageData(this.currentRGBA, 0, 0);\n\
+\n\
+\t\tif(this.externalDecodeCallback) {\n\
+\t\t\tthis.externalDecodeCallback(this, this.canvas);\n\
+\t\t}\n\
+\t}\n\
+\t\n\
+\t// If this is a reference picutre then rotate the prediction pointers\n\
+\tif( this.pictureCodingType == PICTURE_TYPE_I || this.pictureCodingType == PICTURE_TYPE_P ) {\n\
+\t\tvar \n\
+\t\t\ttmpY = this.forwardY,\n\
+\t\t\ttmpY32 = this.forwardY32,\n\
+\t\t\ttmpCr = this.forwardCr,\n\
+\t\t\ttmpCr32 = this.forwardCr32,\n\
+\t\t\ttmpCb = this.forwardCb,\n\
+\t\t\ttmpCb32 = this.forwardCb32;\n\
+\n\
+\t\tthis.forwardY = this.currentY;\n\
+\t\tthis.forwardY32 = this.currentY32;\n\
+\t\tthis.forwardCr = this.currentCr;\n\
+\t\tthis.forwardCr32 = this.currentCr32;\n\
+\t\tthis.forwardCb = this.currentCb;\n\
+\t\tthis.forwardCb32 = this.currentCb32;\n\
+\n\
+\t\tthis.currentY = tmpY;\n\
+\t\tthis.currentY32 = tmpY32;\n\
+\t\tthis.currentCr = tmpCr;\n\
+\t\tthis.currentCr32 = tmpCr32;\n\
+\t\tthis.currentCb = tmpCb;\n\
+\t\tthis.currentCb32 = tmpCb32;\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.YCbCrToRGBA = function() {\t\n\
+\tvar pY = this.currentY;\n\
+\tvar pCb = this.currentCb;\n\
+\tvar pCr = this.currentCr;\n\
+\tvar pRGBA = this.currentRGBA.data;\n\
+\n\
+\t// Chroma values are the same for each block of 4 pixels, so we proccess\n\
+\t// 2 lines at a time, 2 neighboring pixels each.\n\
+\t// I wish we could use 32bit writes to the RGBA buffer instead of writing\n\
+\t// each byte separately, but we need the automatic clamping of the RGBA\n\
+\t// buffer.\n\
+\n\
+\tvar yIndex1 = 0;\n\
+\tvar yIndex2 = this.codedWidth;\n\
+\tvar yNext2Lines = this.codedWidth + (this.codedWidth - this.width);\n\
+\n\
+\tvar cIndex = 0;\n\
+\tvar cNextLine = this.halfWidth - (this.width >> 1);\n\
+\n\
+\tvar rgbaIndex1 = 0;\n\
+\tvar rgbaIndex2 = this.width * 4;\n\
+\tvar rgbaNext2Lines = this.width * 4;\n\
+\t\n\
+\tvar cols = this.width >> 1;\n\
+\tvar rows = this.height >> 1;\n\
+\n\
+\tvar y, cb, cr, r, g, b;\n\
+\n\
+\tfor( var row = 0; row < rows; row++ ) {\n\
+\t\tfor( var col = 0; col < cols; col++ ) {\n\
+\t\t\tcb = pCb[cIndex];\n\
+\t\t\tcr = pCr[cIndex];\n\
+\t\t\tcIndex++;\n\
+\t\t\t\n\
+\t\t\tr = (cr + ((cr * 103) >> 8)) - 179;\n\
+\t\t\tg = ((cb * 88) >> 8) - 44 + ((cr * 183) >> 8) - 91;\n\
+\t\t\tb = (cb + ((cb * 198) >> 8)) - 227;\n\
+\t\t\t\n\
+\t\t\t// Line 1\n\
+\t\t\ty = pY[yIndex1++];\n\
+\t\t\tpRGBA[rgbaIndex1] = y + r;\n\
+\t\t\tpRGBA[rgbaIndex1+1] = y - g;\n\
+\t\t\tpRGBA[rgbaIndex1+2] = y + b;\n\
+\t\t\trgbaIndex1 += 4;\n\
+\t\t\t\n\
+\t\t\ty = pY[yIndex1++];\n\
+\t\t\tpRGBA[rgbaIndex1] = y + r;\n\
+\t\t\tpRGBA[rgbaIndex1+1] = y - g;\n\
+\t\t\tpRGBA[rgbaIndex1+2] = y + b;\n\
+\t\t\trgbaIndex1 += 4;\n\
+\t\t\t\n\
+\t\t\t// Line 2\n\
+\t\t\ty = pY[yIndex2++];\n\
+\t\t\tpRGBA[rgbaIndex2] = y + r;\n\
+\t\t\tpRGBA[rgbaIndex2+1] = y - g;\n\
+\t\t\tpRGBA[rgbaIndex2+2] = y + b;\n\
+\t\t\trgbaIndex2 += 4;\n\
+\t\t\t\n\
+\t\t\ty = pY[yIndex2++];\n\
+\t\t\tpRGBA[rgbaIndex2] = y + r;\n\
+\t\t\tpRGBA[rgbaIndex2+1] = y - g;\n\
+\t\t\tpRGBA[rgbaIndex2+2] = y + b;\n\
+\t\t\trgbaIndex2 += 4;\n\
+\t\t}\n\
+\t\t\n\
+\t\tyIndex1 += yNext2Lines;\n\
+\t\tyIndex2 += yNext2Lines;\n\
+\t\trgbaIndex1 += rgbaNext2Lines;\n\
+\t\trgbaIndex2 += rgbaNext2Lines;\n\
+\t\tcIndex += cNextLine;\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.YToRGBA = function() {\t\n\
+\t// Luma only\n\
+\tvar pY = this.currentY;\n\
+\tvar pRGBA = this.currentRGBA32;\n\
+\n\
+\tvar yIndex = 0;\n\
+\tvar yNext2Lines = (this.codedWidth - this.width);\n\
+\n\
+\tvar rgbaIndex = 0;\t\n\
+\tvar cols = this.width;\n\
+\tvar rows = this.height;\n\
+\n\
+\tvar y;\n\
+\n\
+\tfor( var row = 0; row < rows; row++ ) {\n\
+\t\tfor( var col = 0; col < cols; col++ ) {\n\
+\t\t\ty = pY[yIndex++];\n\
+\t\t\tpRGBA[rgbaIndex++] = 0xff000000 | y << 16 | y << 8 | y;\n\
+\t\t}\n\
+\t\t\n\
+\t\tyIndex += yNext2Lines;\n\
+\t}\n\
+};\n\
+\n\
+\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Slice Layer\n\
+\n\
+jsmpeg.prototype.quantizerScale = 0;\n\
+jsmpeg.prototype.sliceBegin = false;\n\
+\n\
+jsmpeg.prototype.decodeSlice = function(slice) {\t\n\
+\tthis.sliceBegin = true;\n\
+\tthis.macroblockAddress = (slice - 1) * this.mbWidth - 1;\n\
+\t\n\
+\t// Reset motion vectors and DC predictors\n\
+\tthis.motionFwH = this.motionFwHPrev = 0;\n\
+\tthis.motionFwV = this.motionFwVPrev = 0;\n\
+\tthis.dcPredictorY  = 128;\n\
+\tthis.dcPredictorCr = 128;\n\
+\tthis.dcPredictorCb = 128;\n\
+\t\n\
+\tthis.quantizerScale = this.buffer.getBits(5);\n\
+\t\n\
+\t// skip extra bits\n\
+\twhile( this.buffer.getBits(1) ) {\n\
+\t\tthis.buffer.advance(8);\n\
+\t}\n\
+\n\
+\tdo {\n\
+\t\tthis.decodeMacroblock();\n\
+\t\t// We may have to ignore Video Stream Start Codes here (0xE0)!?\n\
+\t} while( !this.buffer.nextBytesAreStartCode() );\n\
+}\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Macroblock Layer\n\
+\n\
+jsmpeg.prototype.macroblockAddress = 0;\n\
+jsmpeg.prototype.mbRow = 0;\n\
+jsmpeg.prototype.mbCol = 0;\n\
+\t\n\
+jsmpeg.prototype.macroblockType = 0;\n\
+jsmpeg.prototype.macroblockIntra = false;\n\
+jsmpeg.prototype.macroblockMotFw = false;\n\
+\t\n\
+jsmpeg.prototype.motionFwH = 0;\n\
+jsmpeg.prototype.motionFwV = 0;\n\
+jsmpeg.prototype.motionFwHPrev = 0;\n\
+jsmpeg.prototype.motionFwVPrev = 0;\n\
+\n\
+jsmpeg.prototype.decodeMacroblock = function() {\n\
+\t// Decode macroblock_address_increment\n\
+\tvar \n\
+\t\tincrement = 0,\n\
+\t\tt = this.readCode(MACROBLOCK_ADDRESS_INCREMENT);\n\
+\t\n\
+\twhile( t == 34 ) {\n\
+\t\t// macroblock_stuffing\n\
+\t\tt = this.readCode(MACROBLOCK_ADDRESS_INCREMENT);\n\
+\t}\n\
+\twhile( t == 35 ) {\n\
+\t\t// macroblock_escape\n\
+\t\tincrement += 33;\n\
+\t\tt = this.readCode(MACROBLOCK_ADDRESS_INCREMENT);\n\
+\t}\n\
+\tincrement += t;\n\
+\n\
+\t// Process any skipped macroblocks\n\
+\tif( this.sliceBegin ) {\n\
+\t\t// The first macroblock_address_increment of each slice is relative\n\
+\t\t// to beginning of the preverious row, not the preverious macroblock\n\
+\t\tthis.sliceBegin = false;\n\
+\t\tthis.macroblockAddress += increment;\n\
+\t}\n\
+\telse {\n\
+\t\tif( this.macroblockAddress + increment >= this.mbSize ) {\n\
+\t\t\t// Illegal (too large) macroblock_address_increment\n\
+\t\t\treturn;\n\
+\t\t}\n\
+\t\tif( increment > 1 ) {\n\
+\t\t\t// Skipped macroblocks reset DC predictors\n\
+\t\t\tthis.dcPredictorY  = 128;\n\
+\t\t\tthis.dcPredictorCr = 128;\n\
+\t\t\tthis.dcPredictorCb = 128;\n\
+\t\t\t\n\
+\t\t\t// Skipped macroblocks in P-pictures reset motion vectors\n\
+\t\t\tif( this.pictureCodingType == PICTURE_TYPE_P ) {\n\
+\t\t\t\tthis.motionFwH = this.motionFwHPrev = 0;\n\
+\t\t\t\tthis.motionFwV = this.motionFwVPrev = 0;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\t\n\
+\t\t// Predict skipped macroblocks\n\
+\t\twhile( increment > 1) {\n\
+\t\t\tthis.macroblockAddress++;\n\
+\t\t\tthis.mbRow = (this.macroblockAddress / this.mbWidth)|0;\n\
+\t\t\tthis.mbCol = this.macroblockAddress % this.mbWidth;\n\
+\t\t\tthis.copyMacroblock(this.motionFwH, this.motionFwV, this.forwardY, this.forwardCr, this.forwardCb);\n\
+\t\t\tincrement--;\n\
+\t\t}\n\
+\t\tthis.macroblockAddress++;\n\
+\t}\n\
+\tthis.mbRow = (this.macroblockAddress / this.mbWidth)|0;\n\
+\tthis.mbCol = this.macroblockAddress % this.mbWidth;\n\
+\n\
+\t// Process the current macroblock\n\
+\tthis.macroblockType = this.readCode(MACROBLOCK_TYPE_TABLES[this.pictureCodingType]);\n\
+\tthis.macroblockIntra = (this.macroblockType & 0x01);\n\
+\tthis.macroblockMotFw = (this.macroblockType & 0x08);\n\
+\n\
+\t// Quantizer scale\n\
+\tif( (this.macroblockType & 0x10) != 0 ) {\n\
+\t\tthis.quantizerScale = this.buffer.getBits(5);\n\
+\t}\n\
+\n\
+\tif( this.macroblockIntra ) {\n\
+\t\t// Intra-coded macroblocks reset motion vectors\n\
+\t\tthis.motionFwH = this.motionFwHPrev = 0;\n\
+\t\tthis.motionFwV = this.motionFwVPrev = 0;\n\
+\t}\n\
+\telse {\n\
+\t\t// Non-intra macroblocks reset DC predictors\n\
+\t\tthis.dcPredictorY = 128;\n\
+\t\tthis.dcPredictorCr = 128;\n\
+\t\tthis.dcPredictorCb = 128;\n\
+\t\t\n\
+\t\tthis.decodeMotionVectors();\n\
+\t\tthis.copyMacroblock(this.motionFwH, this.motionFwV, this.forwardY, this.forwardCr, this.forwardCb);\n\
+\t}\n\
+\n\
+\t// Decode blocks\n\
+\tvar cbp = ((this.macroblockType & 0x02) != 0) \n\
+\t\t? this.readCode(CODE_BLOCK_PATTERN) \n\
+\t\t: (this.macroblockIntra ? 0x3f : 0);\n\
+\n\
+\tfor( var block = 0, mask = 0x20; block < 6; block++ ) {\n\
+\t\tif( (cbp & mask) != 0 ) {\n\
+\t\t\tthis.decodeBlock(block);\n\
+\t\t}\n\
+\t\tmask >>= 1;\n\
+\t}\n\
+};\n\
+\n\
+\n\
+jsmpeg.prototype.decodeMotionVectors = function() {\n\
+\tvar code, d, r = 0;\n\
+\t\n\
+\t// Forward\n\
+\tif( this.macroblockMotFw ) {\n\
+\t\t// Horizontal forward\n\
+\t\tcode = this.readCode(MOTION);\n\
+\t\tif( (code != 0) && (this.forwardF != 1) ) {\n\
+\t\t\tr = this.buffer.getBits(this.forwardRSize);\n\
+\t\t\td = ((Math.abs(code) - 1) << this.forwardRSize) + r + 1;\n\
+\t\t\tif( code < 0 ) {\n\
+\t\t\t\td = -d;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\td = code;\n\
+\t\t}\n\
+\t\t\n\
+\t\tthis.motionFwHPrev += d;\n\
+\t\tif( this.motionFwHPrev > (this.forwardF << 4) - 1 ) {\n\
+\t\t\tthis.motionFwHPrev -= this.forwardF << 5;\n\
+\t\t}\n\
+\t\telse if( this.motionFwHPrev < ((-this.forwardF) << 4) ) {\n\
+\t\t\tthis.motionFwHPrev += this.forwardF << 5;\n\
+\t\t}\n\
+\t\t\n\
+\t\tthis.motionFwH = this.motionFwHPrev;\n\
+\t\tif( this.fullPelForward ) {\n\
+\t\t\tthis.motionFwH <<= 1;\n\
+\t\t}\n\
+\t\t\n\
+\t\t// Vertical forward\n\
+\t\tcode = this.readCode(MOTION);\n\
+\t\tif( (code != 0) && (this.forwardF != 1) ) {\n\
+\t\t\tr = this.buffer.getBits(this.forwardRSize);\n\
+\t\t\td = ((Math.abs(code) - 1) << this.forwardRSize) + r + 1;\n\
+\t\t\tif( code < 0 ) {\n\
+\t\t\t\td = -d;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\td = code;\n\
+\t\t}\n\
+\t\t\n\
+\t\tthis.motionFwVPrev += d;\n\
+\t\tif( this.motionFwVPrev > (this.forwardF << 4) - 1 ) {\n\
+\t\t\tthis.motionFwVPrev -= this.forwardF << 5;\n\
+\t\t}\n\
+\t\telse if( this.motionFwVPrev < ((-this.forwardF) << 4) ) {\n\
+\t\t\tthis.motionFwVPrev += this.forwardF << 5;\n\
+\t\t}\n\
+\t\t\n\
+\t\tthis.motionFwV = this.motionFwVPrev;\n\
+\t\tif( this.fullPelForward ) {\n\
+\t\t\tthis.motionFwV <<= 1;\n\
+\t\t}\n\
+\t}\n\
+\telse if( this.pictureCodingType == PICTURE_TYPE_P ) {\n\
+\t\t// No motion information in P-picture, reset vectors\n\
+\t\tthis.motionFwH = this.motionFwHPrev = 0;\n\
+\t\tthis.motionFwV = this.motionFwVPrev = 0;\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.copyMacroblock = function(motionH, motionV, sY, sCr, sCb ) {\n\
+\tvar \n\
+\t\twidth, scan, \n\
+\t\tH, V, oddH, oddV,\n\
+\t\tsrc, dest, last;\n\
+\n\
+\t// We use 32bit writes here\n\
+\tvar dY = this.currentY32;\n\
+\tvar dCb = this.currentCb32;\n\
+\tvar dCr = this.currentCr32;\n\
+\n\
+\t// Luminance\n\
+\twidth = this.codedWidth;\n\
+\tscan = width - 16;\n\
+\t\n\
+\tH = motionH >> 1;\n\
+\tV = motionV >> 1;\n\
+\toddH = (motionH & 1) == 1;\n\
+\toddV = (motionV & 1) == 1;\n\
+\t\n\
+\tsrc = ((this.mbRow << 4) + V) * width + (this.mbCol << 4) + H;\n\
+\tdest = (this.mbRow * width + this.mbCol) << 2;\n\
+\tlast = dest + (width << 2);\n\
+\n\
+\tvar y1, y2, y;\n\
+\tif( oddH ) {\n\
+\t\tif( oddV ) {\n\
+\t\t\twhile( dest < last ) {\n\
+\t\t\t\ty1 = sY[src] + sY[src+width]; src++;\n\
+\t\t\t\tfor( var x = 0; x < 4; x++ ) {\n\
+\t\t\t\t\ty2 = sY[src] + sY[src+width]; src++;\n\
+\t\t\t\t\ty = (((y1 + y2 + 2) >> 2) & 0xff);\n\
+\n\
+\t\t\t\t\ty1 = sY[src] + sY[src+width]; src++;\n\
+\t\t\t\t\ty |= (((y1 + y2 + 2) << 6) & 0xff00);\n\
+\t\t\t\t\t\n\
+\t\t\t\t\ty2 = sY[src] + sY[src+width]; src++;\n\
+\t\t\t\t\ty |= (((y1 + y2 + 2) << 14) & 0xff0000);\n\
+\n\
+\t\t\t\t\ty1 = sY[src] + sY[src+width]; src++;\n\
+\t\t\t\t\ty |= (((y1 + y2 + 2) << 22) & 0xff000000);\n\
+\n\
+\t\t\t\t\tdY[dest++] = y;\n\
+\t\t\t\t}\n\
+\t\t\t\tdest += scan >> 2; src += scan-1;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\twhile( dest < last ) {\n\
+\t\t\t\ty1 = sY[src++];\n\
+\t\t\t\tfor( var x = 0; x < 4; x++ ) {\n\
+\t\t\t\t\ty2 = sY[src++];\n\
+\t\t\t\t\ty = (((y1 + y2 + 1) >> 1) & 0xff);\n\
+\t\t\t\t\t\n\
+\t\t\t\t\ty1 = sY[src++];\n\
+\t\t\t\t\ty |= (((y1 + y2 + 1) << 7) & 0xff00);\n\
+\t\t\t\t\t\n\
+\t\t\t\t\ty2 = sY[src++];\n\
+\t\t\t\t\ty |= (((y1 + y2 + 1) << 15) & 0xff0000);\n\
+\t\t\t\t\t\n\
+\t\t\t\t\ty1 = sY[src++];\n\
+\t\t\t\t\ty |= (((y1 + y2 + 1) << 23) & 0xff000000);\n\
+\n\
+\t\t\t\t\tdY[dest++] = y;\n\
+\t\t\t\t}\n\
+\t\t\t\tdest += scan >> 2; src += scan-1;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t}\n\
+\telse {\n\
+\t\tif( oddV ) {\n\
+\t\t\twhile( dest < last ) {\n\
+\t\t\t\tfor( var x = 0; x < 4; x++ ) {\n\
+\t\t\t\t\ty = (((sY[src] + sY[src+width] + 1) >> 1) & 0xff); src++;\n\
+\t\t\t\t\ty |= (((sY[src] + sY[src+width] + 1) << 7) & 0xff00); src++;\n\
+\t\t\t\t\ty |= (((sY[src] + sY[src+width] + 1) << 15) & 0xff0000); src++;\n\
+\t\t\t\t\ty |= (((sY[src] + sY[src+width] + 1) << 23) & 0xff000000); src++;\n\
+\t\t\t\t\t\n\
+\t\t\t\t\tdY[dest++] = y;\n\
+\t\t\t\t}\n\
+\t\t\t\tdest += scan >> 2; src += scan;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\twhile( dest < last ) {\n\
+\t\t\t\tfor( var x = 0; x < 4; x++ ) {\n\
+\t\t\t\t\ty = sY[src]; src++;\n\
+\t\t\t\t\ty |= sY[src] << 8; src++;\n\
+\t\t\t\t\ty |= sY[src] << 16; src++;\n\
+\t\t\t\t\ty |= sY[src] << 24; src++;\n\
+\n\
+\t\t\t\t\tdY[dest++] = y;\n\
+\t\t\t\t}\n\
+\t\t\t\tdest += scan >> 2; src += scan;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t}\n\
+\t\n\
+\tif( this.bwFilter ) {\n\
+\t\t// No need to copy chrominance when black&white filter is active\n\
+\t\treturn;\n\
+\t}\n\
+\t\n\
+\n\
+\t// Chrominance\n\
+\t\n\
+\twidth = this.halfWidth;\n\
+\tscan = width - 8;\n\
+\t\n\
+\tH = (motionH/2) >> 1;\n\
+\tV = (motionV/2) >> 1;\n\
+\toddH = ((motionH/2) & 1) == 1;\n\
+\toddV = ((motionV/2) & 1) == 1;\n\
+\t\n\
+\tsrc = ((this.mbRow << 3) + V) * width + (this.mbCol << 3) + H;\n\
+\tdest = (this.mbRow * width + this.mbCol) << 1;\n\
+\tlast = dest + (width << 1);\n\
+\t\n\
+\tvar cr1, cr2, cr;\n\
+\tvar cb1, cb2, cb;\n\
+\tif( oddH ) {\n\
+\t\tif( oddV ) {\n\
+\t\t\twhile( dest < last ) {\n\
+\t\t\t\tcr1 = sCr[src] + sCr[src+width];\n\
+\t\t\t\tcb1 = sCb[src] + sCb[src+width];\n\
+\t\t\t\tsrc++;\n\
+\t\t\t\tfor( var x = 0; x < 2; x++ ) {\n\
+\t\t\t\t\tcr2 = sCr[src] + sCr[src+width];\n\
+\t\t\t\t\tcb2 = sCb[src] + sCb[src+width]; src++;\n\
+\t\t\t\t\tcr = (((cr1 + cr2 + 2) >> 2) & 0xff);\n\
+\t\t\t\t\tcb = (((cb1 + cb2 + 2) >> 2) & 0xff);\n\
+\n\
+\t\t\t\t\tcr1 = sCr[src] + sCr[src+width];\n\
+\t\t\t\t\tcb1 = sCb[src] + sCb[src+width]; src++;\n\
+\t\t\t\t\tcr |= (((cr1 + cr2 + 2) << 6) & 0xff00);\n\
+\t\t\t\t\tcb |= (((cb1 + cb2 + 2) << 6) & 0xff00);\n\
+\n\
+\t\t\t\t\tcr2 = sCr[src] + sCr[src+width];\n\
+\t\t\t\t\tcb2 = sCb[src] + sCb[src+width]; src++;\n\
+\t\t\t\t\tcr |= (((cr1 + cr2 + 2) << 14) & 0xff0000);\n\
+\t\t\t\t\tcb |= (((cb1 + cb2 + 2) << 14) & 0xff0000);\n\
+\n\
+\t\t\t\t\tcr1 = sCr[src] + sCr[src+width];\n\
+\t\t\t\t\tcb1 = sCb[src] + sCb[src+width]; src++;\n\
+\t\t\t\t\tcr |= (((cr1 + cr2 + 2) << 22) & 0xff000000);\n\
+\t\t\t\t\tcb |= (((cb1 + cb2 + 2) << 22) & 0xff000000);\n\
+\n\
+\t\t\t\t\tdCr[dest] = cr;\n\
+\t\t\t\t\tdCb[dest] = cb;\n\
+\t\t\t\t\tdest++;\n\
+\t\t\t\t}\n\
+\t\t\t\tdest += scan >> 2; src += scan-1;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\twhile( dest < last ) {\n\
+\t\t\t\tcr1 = sCr[src];\n\
+\t\t\t\tcb1 = sCb[src];\n\
+\t\t\t\tsrc++;\n\
+\t\t\t\tfor( var x = 0; x < 2; x++ ) {\n\
+\t\t\t\t\tcr2 = sCr[src];\n\
+\t\t\t\t\tcb2 = sCb[src++];\n\
+\t\t\t\t\tcr = (((cr1 + cr2 + 1) >> 1) & 0xff);\n\
+\t\t\t\t\tcb = (((cb1 + cb2 + 1) >> 1) & 0xff);\n\
+\n\
+\t\t\t\t\tcr1 = sCr[src];\n\
+\t\t\t\t\tcb1 = sCb[src++];\n\
+\t\t\t\t\tcr |= (((cr1 + cr2 + 1) << 7) & 0xff00);\n\
+\t\t\t\t\tcb |= (((cb1 + cb2 + 1) << 7) & 0xff00);\n\
+\n\
+\t\t\t\t\tcr2 = sCr[src];\n\
+\t\t\t\t\tcb2 = sCb[src++];\n\
+\t\t\t\t\tcr |= (((cr1 + cr2 + 1) << 15) & 0xff0000);\n\
+\t\t\t\t\tcb |= (((cb1 + cb2 + 1) << 15) & 0xff0000);\n\
+\n\
+\t\t\t\t\tcr1 = sCr[src];\n\
+\t\t\t\t\tcb1 = sCb[src++];\n\
+\t\t\t\t\tcr |= (((cr1 + cr2 + 1) << 23) & 0xff000000);\n\
+\t\t\t\t\tcb |= (((cb1 + cb2 + 1) << 23) & 0xff000000);\n\
+\n\
+\t\t\t\t\tdCr[dest] = cr;\n\
+\t\t\t\t\tdCb[dest] = cb;\n\
+\t\t\t\t\tdest++;\n\
+\t\t\t\t}\n\
+\t\t\t\tdest += scan >> 2; src += scan-1;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t}\n\
+\telse {\n\
+\t\tif( oddV ) {\n\
+\t\t\twhile( dest < last ) {\n\
+\t\t\t\tfor( var x = 0; x < 2; x++ ) {\n\
+\t\t\t\t\tcr = (((sCr[src] + sCr[src+width] + 1) >> 1) & 0xff);\n\
+\t\t\t\t\tcb = (((sCb[src] + sCb[src+width] + 1) >> 1) & 0xff); src++;\n\
+\n\
+\t\t\t\t\tcr |= (((sCr[src] + sCr[src+width] + 1) << 7) & 0xff00);\n\
+\t\t\t\t\tcb |= (((sCb[src] + sCb[src+width] + 1) << 7) & 0xff00); src++;\n\
+\n\
+\t\t\t\t\tcr |= (((sCr[src] + sCr[src+width] + 1) << 15) & 0xff0000);\n\
+\t\t\t\t\tcb |= (((sCb[src] + sCb[src+width] + 1) << 15) & 0xff0000); src++;\n\
+\n\
+\t\t\t\t\tcr |= (((sCr[src] + sCr[src+width] + 1) << 23) & 0xff000000);\n\
+\t\t\t\t\tcb |= (((sCb[src] + sCb[src+width] + 1) << 23) & 0xff000000); src++;\n\
+\t\t\t\t\t\n\
+\t\t\t\t\tdCr[dest] = cr;\n\
+\t\t\t\t\tdCb[dest] = cb;\n\
+\t\t\t\t\tdest++;\n\
+\t\t\t\t}\n\
+\t\t\t\tdest += scan >> 2; src += scan;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\twhile( dest < last ) {\n\
+\t\t\t\tfor( var x = 0; x < 2; x++ ) {\n\
+\t\t\t\t\tcr = sCr[src];\n\
+\t\t\t\t\tcb = sCb[src]; src++;\n\
+\n\
+\t\t\t\t\tcr |= sCr[src] << 8;\n\
+\t\t\t\t\tcb |= sCb[src] << 8; src++;\n\
+\n\
+\t\t\t\t\tcr |= sCr[src] << 16;\n\
+\t\t\t\t\tcb |= sCb[src] << 16; src++;\n\
+\n\
+\t\t\t\t\tcr |= sCr[src] << 24;\n\
+\t\t\t\t\tcb |= sCb[src] << 24; src++;\n\
+\n\
+\t\t\t\t\tdCr[dest] = cr;\n\
+\t\t\t\t\tdCb[dest] = cb;\n\
+\t\t\t\t\tdest++;\n\
+\t\t\t\t}\n\
+\t\t\t\tdest += scan >> 2; src += scan;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t}\n\
+};\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Block layer\n\
+\n\
+jsmpeg.prototype.dcPredictorY;\n\
+jsmpeg.prototype.dcPredictorCr;\n\
+jsmpeg.prototype.dcPredictorCb;\n\
+\n\
+jsmpeg.prototype.blockData = null;\n\
+jsmpeg.prototype.decodeBlock = function(block) {\n\
+\t\n\
+\tvar\n\
+\t\tn = 0,\n\
+\t\tquantMatrix;\n\
+\t\n\
+\t// Clear preverious data\n\
+\tthis.fillArray(this.blockData, 0);\n\
+\t\n\
+\t// Decode DC coefficient of intra-coded blocks\n\
+\tif( this.macroblockIntra ) {\n\
+\t\tvar \n\
+\t\t\tpredictor,\n\
+\t\t\tdctSize;\n\
+\t\t\n\
+\t\t// DC prediction\n\
+\t\t\n\
+\t\tif( block < 4 ) {\n\
+\t\t\tpredictor = this.dcPredictorY;\n\
+\t\t\tdctSize = this.readCode(DCT_DC_SIZE_LUMINANCE);\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\tpredictor = (block == 4 ? this.dcPredictorCr : this.dcPredictorCb);\n\
+\t\t\tdctSize = this.readCode(DCT_DC_SIZE_CHROMINANCE);\n\
+\t\t}\n\
+\t\t\n\
+\t\t// Read DC coeff\n\
+\t\tif( dctSize > 0 ) {\n\
+\t\t\tvar differential = this.buffer.getBits(dctSize);\n\
+\t\t\tif( (differential & (1 << (dctSize - 1))) != 0 ) {\n\
+\t\t\t\tthis.blockData[0] = predictor + differential;\n\
+\t\t\t}\n\
+\t\t\telse {\n\
+\t\t\t\tthis.blockData[0] = predictor + ((-1 << dctSize)|(differential+1));\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\tthis.blockData[0] = predictor;\n\
+\t\t}\n\
+\t\t\n\
+\t\t// Save predictor value\n\
+\t\tif( block < 4 ) {\n\
+\t\t\tthis.dcPredictorY = this.blockData[0];\n\
+\t\t}\n\
+\t\telse if( block == 4 ) {\n\
+\t\t\tthis.dcPredictorCr = this.blockData[0];\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\tthis.dcPredictorCb = this.blockData[0];\n\
+\t\t}\n\
+\t\t\n\
+\t\t// Dequantize + premultiply\n\
+\t\tthis.blockData[0] <<= (3 + 5);\n\
+\t\t\n\
+\t\tquantMatrix = this.intraQuantMatrix;\n\
+\t\tn = 1;\n\
+\t}\n\
+\telse {\n\
+\t\tquantMatrix = this.nonIntraQuantMatrix;\n\
+\t}\n\
+\t\n\
+\t// Decode AC coefficients (+DC for non-intra)\n\
+\tvar level = 0;\n\
+\twhile( true ) {\n\
+\t\tvar \n\
+\t\t\trun = 0,\n\
+\t\t\tcoeff = this.readCode(DCT_COEFF);\n\
+\t\t\n\
+\t\tif( (coeff == 0x0001) && (n > 0) && (this.buffer.getBits(1) == 0) ) {\n\
+\t\t\t// end_of_block\n\
+\t\t\tbreak;\n\
+\t\t}\n\
+\t\tif( coeff == 0xffff ) {\n\
+\t\t\t// escape\n\
+\t\t\trun = this.buffer.getBits(6);\n\
+\t\t\tlevel = this.buffer.getBits(8);\n\
+\t\t\tif( level == 0 ) {\n\
+\t\t\t\tlevel = this.buffer.getBits(8);\n\
+\t\t\t}\n\
+\t\t\telse if( level == 128 ) {\n\
+\t\t\t\tlevel = this.buffer.getBits(8) - 256;\n\
+\t\t\t}\n\
+\t\t\telse if( level > 128 ) {\n\
+\t\t\t\tlevel = level - 256;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\telse {\n\
+\t\t\trun = coeff >> 8;\n\
+\t\t\tlevel = coeff & 0xff;\n\
+\t\t\tif( this.buffer.getBits(1) ) {\n\
+\t\t\t\tlevel = -level;\n\
+\t\t\t}\n\
+\t\t}\n\
+\t\t\n\
+\t\tn += run;\n\
+\t\tvar dezigZagged = ZIG_ZAG[n];\n\
+\t\tn++;\n\
+\t\t\n\
+\t\t// Dequantize, oddify, clip\n\
+\t\tlevel <<= 1;\n\
+\t\tif( !this.macroblockIntra ) {\n\
+\t\t\tlevel += (level < 0 ? -1 : 1);\n\
+\t\t}\n\
+\t\tlevel = (level * this.quantizerScale * quantMatrix[dezigZagged]) >> 4;\n\
+\t\tif( (level & 1) == 0 ) {\n\
+\t\t\tlevel -= level > 0 ? 1 : -1;\n\
+\t\t}\n\
+\t\tif( level > 2047 ) {\n\
+\t\t\tlevel = 2047;\n\
+\t\t}\n\
+\t\telse if( level < -2048 ) {\n\
+\t\t\tlevel = -2048;\n\
+\t\t}\n\
+\n\
+\t\t// Save premultiplied coefficient\n\
+\t\tthis.blockData[dezigZagged] = level * PREMULTIPLIER_MATRIX[dezigZagged];\n\
+\t};\n\
+\t\n\
+\t// Transform block data to the spatial domain\n\
+\tif( n == 1 ) {\n\
+\t\t// Only DC coeff., no IDCT needed\n\
+\t\tthis.fillArray(this.blockData, (this.blockData[0] + 128) >> 8);\n\
+\t}\n\
+\telse {\n\
+\t\tthis.IDCT();\n\
+\t}\n\
+\t\n\
+\t// Move block to its place\n\
+\tvar\n\
+\t\tdestArray,\n\
+\t\tdestIndex,\n\
+\t\tscan;\n\
+\t\n\
+\tif( block < 4 ) {\n\
+\t\tdestArray = this.currentY;\n\
+\t\tscan = this.codedWidth - 8;\n\
+\t\tdestIndex = (this.mbRow * this.codedWidth + this.mbCol) << 4;\n\
+\t\tif( (block & 1) != 0 ) {\n\
+\t\t\tdestIndex += 8;\n\
+\t\t}\n\
+\t\tif( (block & 2) != 0 ) {\n\
+\t\t\tdestIndex += this.codedWidth << 3;\n\
+\t\t}\n\
+\t}\n\
+\telse {\n\
+\t\tdestArray = (block == 4) ? this.currentCb : this.currentCr;\n\
+\t\tscan = (this.codedWidth >> 1) - 8;\n\
+\t\tdestIndex = ((this.mbRow * this.codedWidth) << 2) + (this.mbCol << 3);\n\
+\t}\n\
+\t\n\
+\tn = 0;\n\
+\t\n\
+\tvar blockData = this.blockData;\n\
+\tif( this.macroblockIntra ) {\n\
+\t\t// Overwrite (no prediction)\n\
+\t\tthis.copyBlockToDestination(this.blockData, destArray, destIndex, scan);\n\
+\t}\n\
+\telse {\n\
+\t\t// Add data to the predicted macroblock\n\
+\t\tthis.addBlockToDestination(this.blockData, destArray, destIndex, scan);\n\
+\t}\n\
+};\n\
+\n\
+\n\
+jsmpeg.prototype.copyBlockToDestination = function(blockData, destArray, destIndex, scan) {\n\
+\tvar n = 0;\n\
+\tfor( var i = 0; i < 8; i++ ) {\n\
+\t\tfor( var j = 0; j < 8; j++ ) {\n\
+\t\t\tdestArray[destIndex++] = blockData[n++];\n\
+\t\t}\n\
+\t\tdestIndex += scan;\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.addBlockToDestination = function(blockData, destArray, destIndex, scan) {\n\
+\tvar n = 0;\n\
+\tfor( var i = 0; i < 8; i++ ) {\n\
+\t\tfor( var j = 0; j < 8; j++ ) {\n\
+\t\t\tdestArray[destIndex++] += blockData[n++];\n\
+\t\t}\n\
+\t\tdestIndex += scan;\n\
+\t}\n\
+};\n\
+\n\
+// Clamping version for shitty browsers (IE) that don't support Uint8ClampedArray\n\
+jsmpeg.prototype.copyBlockToDestinationClamp = function(blockData, destArray, destIndex, scan) {\n\
+\tvar n = 0;\n\
+\tfor( var i = 0; i < 8; i++ ) {\n\
+\t\tfor( var j = 0; j < 8; j++ ) {\n\
+\t\t\tvar p = blockData[n++];\n\
+\t\t\tdestArray[destIndex++] = p > 255 ? 255 : (p < 0 ? 0 : p);\n\
+\t\t}\n\
+\t\tdestIndex += scan;\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.addBlockToDestinationClamp = function(blockData, destArray, destIndex, scan) {\n\
+\tvar n = 0;\n\
+\tfor( var i = 0; i < 8; i++ ) {\n\
+\t\tfor( var j = 0; j < 8; j++ ) {\n\
+\t\t\tvar p = blockData[n++] + destArray[destIndex];\n\
+\t\t\tdestArray[destIndex++] = p > 255 ? 255 : (p < 0 ? 0 : p);\n\
+\t\t}\n\
+\t\tdestIndex += scan;\n\
+\t}\n\
+};\n\
+\n\
+jsmpeg.prototype.IDCT = function() {\n\
+\t// See http://vsr.informatik.tu-chemnitz.de/~jan/MPEG/HTML/IDCT.html\n\
+\t// for more info.\n\
+\t\n\
+\tvar \n\
+\t\tb1, b3, b4, b6, b7, tmp1, tmp2, m0,\n\
+\t\tx0, x1, x2, x3, x4, y3, y4, y5, y6, y7,\n\
+\t\ti,\n\
+\t\tblockData = this.blockData;\n\
+\t\n\
+\t// Transform columns\n\
+\tfor( i = 0; i < 8; ++i ) {\n\
+\t\tb1 =  blockData[4*8+i];\n\
+\t\tb3 =  blockData[2*8+i] + blockData[6*8+i];\n\
+\t\tb4 =  blockData[5*8+i] - blockData[3*8+i];\n\
+\t\ttmp1 = blockData[1*8+i] + blockData[7*8+i];\n\
+\t\ttmp2 = blockData[3*8+i] + blockData[5*8+i];\n\
+\t\tb6 = blockData[1*8+i] - blockData[7*8+i];\n\
+\t\tb7 = tmp1 + tmp2;\n\
+\t\tm0 =  blockData[0*8+i];\n\
+\t\tx4 =  ((b6*473 - b4*196 + 128) >> 8) - b7;\n\
+\t\tx0 =  x4 - (((tmp1 - tmp2)*362 + 128) >> 8);\n\
+\t\tx1 =  m0 - b1;\n\
+\t\tx2 =  (((blockData[2*8+i] - blockData[6*8+i])*362 + 128) >> 8) - b3;\n\
+\t\tx3 =  m0 + b1;\n\
+\t\ty3 =  x1 + x2;\n\
+\t\ty4 =  x3 + b3;\n\
+\t\ty5 =  x1 - x2;\n\
+\t\ty6 =  x3 - b3;\n\
+\t\ty7 = -x0 - ((b4*473 + b6*196 + 128) >> 8);\n\
+\t\tblockData[0*8+i] =  b7 + y4;\n\
+\t\tblockData[1*8+i] =  x4 + y3;\n\
+\t\tblockData[2*8+i] =  y5 - x0;\n\
+\t\tblockData[3*8+i] =  y6 - y7;\n\
+\t\tblockData[4*8+i] =  y6 + y7;\n\
+\t\tblockData[5*8+i] =  x0 + y5;\n\
+\t\tblockData[6*8+i] =  y3 - x4;\n\
+\t\tblockData[7*8+i] =  y4 - b7;\n\
+\t}\n\
+\t\n\
+\t// Transform rows\n\
+\tfor( i = 0; i < 64; i += 8 ) {\n\
+\t\tb1 =  blockData[4+i];\n\
+\t\tb3 =  blockData[2+i] + blockData[6+i];\n\
+\t\tb4 =  blockData[5+i] - blockData[3+i];\n\
+\t\ttmp1 = blockData[1+i] + blockData[7+i];\n\
+\t\ttmp2 = blockData[3+i] + blockData[5+i];\n\
+\t\tb6 = blockData[1+i] - blockData[7+i];\n\
+\t\tb7 = tmp1 + tmp2;\n\
+\t\tm0 =  blockData[0+i];\n\
+\t\tx4 =  ((b6*473 - b4*196 + 128) >> 8) - b7;\n\
+\t\tx0 =  x4 - (((tmp1 - tmp2)*362 + 128) >> 8);\n\
+\t\tx1 =  m0 - b1;\n\
+\t\tx2 =  (((blockData[2+i] - blockData[6+i])*362 + 128) >> 8) - b3;\n\
+\t\tx3 =  m0 + b1;\n\
+\t\ty3 =  x1 + x2;\n\
+\t\ty4 =  x3 + b3;\n\
+\t\ty5 =  x1 - x2;\n\
+\t\ty6 =  x3 - b3;\n\
+\t\ty7 = -x0 - ((b4*473 + b6*196 + 128) >> 8);\n\
+\t\tblockData[0+i] =  (b7 + y4 + 128) >> 8;\n\
+\t\tblockData[1+i] =  (x4 + y3 + 128) >> 8;\n\
+\t\tblockData[2+i] =  (y5 - x0 + 128) >> 8;\n\
+\t\tblockData[3+i] =  (y6 - y7 + 128) >> 8;\n\
+\t\tblockData[4+i] =  (y6 + y7 + 128) >> 8;\n\
+\t\tblockData[5+i] =  (x0 + y5 + 128) >> 8;\n\
+\t\tblockData[6+i] =  (y3 - x4 + 128) >> 8;\n\
+\t\tblockData[7+i] =  (y4 - b7 + 128) >> 8;\n\
+\t}\n\
+};\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// VLC Tables and Constants\n\
+\n\
+var\n\
+\tSOCKET_MAGIC_BYTES = 'jsmp',\n\
+\tDECODE_SKIP_OUTPUT = 1,\n\
+\tPICTURE_RATE = [\n\
+\t\t0.000, 23.976, 24.000, 25.000, 29.970, 30.000, 50.000, 59.940,\n\
+\t\t60.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000\n\
+\t],\n\
+\tZIG_ZAG = new Uint8Array([\n\
+\t\t 0,  1,  8, 16,  9,  2,  3, 10,\n\
+\t\t17, 24, 32, 25, 18, 11,  4,  5,\n\
+\t\t12, 19, 26, 33, 40, 48, 41, 34,\n\
+\t\t27, 20, 13,  6,  7, 14, 21, 28,\n\
+\t\t35, 42, 49, 56, 57, 50, 43, 36,\n\
+\t\t29, 22, 15, 23, 30, 37, 44, 51,\n\
+\t\t58, 59, 52, 45, 38, 31, 39, 46,\n\
+\t\t53, 60, 61, 54, 47, 55, 62, 63\n\
+\t]),\n\
+\tDEFAULT_INTRA_QUANT_MATRIX = new Uint8Array([\n\
+\t\t 8, 16, 19, 22, 26, 27, 29, 34,\n\
+\t\t16, 16, 22, 24, 27, 29, 34, 37,\n\
+\t\t19, 22, 26, 27, 29, 34, 34, 38,\n\
+\t\t22, 22, 26, 27, 29, 34, 37, 40,\n\
+\t\t22, 26, 27, 29, 32, 35, 40, 48,\n\
+\t\t26, 27, 29, 32, 35, 40, 48, 58,\n\
+\t\t26, 27, 29, 34, 38, 46, 56, 69,\n\
+\t\t27, 29, 35, 38, 46, 56, 69, 83\n\
+\t]),\n\
+\tDEFAULT_NON_INTRA_QUANT_MATRIX = new Uint8Array([\n\
+\t\t16, 16, 16, 16, 16, 16, 16, 16,\n\
+\t\t16, 16, 16, 16, 16, 16, 16, 16,\n\
+\t\t16, 16, 16, 16, 16, 16, 16, 16,\n\
+\t\t16, 16, 16, 16, 16, 16, 16, 16,\n\
+\t\t16, 16, 16, 16, 16, 16, 16, 16,\n\
+\t\t16, 16, 16, 16, 16, 16, 16, 16,\n\
+\t\t16, 16, 16, 16, 16, 16, 16, 16,\n\
+\t\t16, 16, 16, 16, 16, 16, 16, 16\n\
+\t]),\n\
+\t\n\
+\tPREMULTIPLIER_MATRIX = new Uint8Array([\n\
+\t\t32, 44, 42, 38, 32, 25, 17,  9,\n\
+\t\t44, 62, 58, 52, 44, 35, 24, 12,\n\
+\t\t42, 58, 55, 49, 42, 33, 23, 12,\n\
+\t\t38, 52, 49, 44, 38, 30, 20, 10,\n\
+\t\t32, 44, 42, 38, 32, 25, 17,  9,\n\
+\t\t25, 35, 33, 30, 25, 20, 14,  7,\n\
+\t\t17, 24, 23, 20, 17, 14,  9,  5,\n\
+\t\t 9, 12, 12, 10,  9,  7,  5,  2\n\
+\t]),\n\
+\t\n\
+\t// MPEG-1 VLC\n\
+\t\n\
+\t//  macroblock_stuffing decodes as 34.\n\
+\t//  macroblock_escape decodes as 35.\n\
+\t\n\
+\tMACROBLOCK_ADDRESS_INCREMENT = new Int16Array([\n\
+\t\t 1*3,  2*3,  0, //   0\n\
+\t\t 3*3,  4*3,  0, //   1  0\n\
+\t\t   0,    0,  1, //   2  1.\n\
+\t\t 5*3,  6*3,  0, //   3  00\n\
+\t\t 7*3,  8*3,  0, //   4  01\n\
+\t\t 9*3, 10*3,  0, //   5  000\n\
+\t\t11*3, 12*3,  0, //   6  001\n\
+\t\t   0,    0,  3, //   7  010.\n\
+\t\t   0,    0,  2, //   8  011.\n\
+\t\t13*3, 14*3,  0, //   9  0000\n\
+\t\t15*3, 16*3,  0, //  10  0001\n\
+\t\t   0,    0,  5, //  11  0010.\n\
+\t\t   0,    0,  4, //  12  0011.\n\
+\t\t17*3, 18*3,  0, //  13  0000 0\n\
+\t\t19*3, 20*3,  0, //  14  0000 1\n\
+\t\t   0,    0,  7, //  15  0001 0.\n\
+\t\t   0,    0,  6, //  16  0001 1.\n\
+\t\t21*3, 22*3,  0, //  17  0000 00\n\
+\t\t23*3, 24*3,  0, //  18  0000 01\n\
+\t\t25*3, 26*3,  0, //  19  0000 10\n\
+\t\t27*3, 28*3,  0, //  20  0000 11\n\
+\t\t  -1, 29*3,  0, //  21  0000 000\n\
+\t\t  -1, 30*3,  0, //  22  0000 001\n\
+\t\t31*3, 32*3,  0, //  23  0000 010\n\
+\t\t33*3, 34*3,  0, //  24  0000 011\n\
+\t\t35*3, 36*3,  0, //  25  0000 100\n\
+\t\t37*3, 38*3,  0, //  26  0000 101\n\
+\t\t   0,    0,  9, //  27  0000 110.\n\
+\t\t   0,    0,  8, //  28  0000 111.\n\
+\t\t39*3, 40*3,  0, //  29  0000 0001\n\
+\t\t41*3, 42*3,  0, //  30  0000 0011\n\
+\t\t43*3, 44*3,  0, //  31  0000 0100\n\
+\t\t45*3, 46*3,  0, //  32  0000 0101\n\
+\t\t   0,    0, 15, //  33  0000 0110.\n\
+\t\t   0,    0, 14, //  34  0000 0111.\n\
+\t\t   0,    0, 13, //  35  0000 1000.\n\
+\t\t   0,    0, 12, //  36  0000 1001.\n\
+\t\t   0,    0, 11, //  37  0000 1010.\n\
+\t\t   0,    0, 10, //  38  0000 1011.\n\
+\t\t47*3,   -1,  0, //  39  0000 0001 0\n\
+\t\t  -1, 48*3,  0, //  40  0000 0001 1\n\
+\t\t49*3, 50*3,  0, //  41  0000 0011 0\n\
+\t\t51*3, 52*3,  0, //  42  0000 0011 1\n\
+\t\t53*3, 54*3,  0, //  43  0000 0100 0\n\
+\t\t55*3, 56*3,  0, //  44  0000 0100 1\n\
+\t\t57*3, 58*3,  0, //  45  0000 0101 0\n\
+\t\t59*3, 60*3,  0, //  46  0000 0101 1\n\
+\t\t61*3,   -1,  0, //  47  0000 0001 00\n\
+\t\t  -1, 62*3,  0, //  48  0000 0001 11\n\
+\t\t63*3, 64*3,  0, //  49  0000 0011 00\n\
+\t\t65*3, 66*3,  0, //  50  0000 0011 01\n\
+\t\t67*3, 68*3,  0, //  51  0000 0011 10\n\
+\t\t69*3, 70*3,  0, //  52  0000 0011 11\n\
+\t\t71*3, 72*3,  0, //  53  0000 0100 00\n\
+\t\t73*3, 74*3,  0, //  54  0000 0100 01\n\
+\t\t   0,    0, 21, //  55  0000 0100 10.\n\
+\t\t   0,    0, 20, //  56  0000 0100 11.\n\
+\t\t   0,    0, 19, //  57  0000 0101 00.\n\
+\t\t   0,    0, 18, //  58  0000 0101 01.\n\
+\t\t   0,    0, 17, //  59  0000 0101 10.\n\
+\t\t   0,    0, 16, //  60  0000 0101 11.\n\
+\t\t   0,    0, 35, //  61  0000 0001 000. -- macroblock_escape\n\
+\t\t   0,    0, 34, //  62  0000 0001 111. -- macroblock_stuffing\n\
+\t\t   0,    0, 33, //  63  0000 0011 000.\n\
+\t\t   0,    0, 32, //  64  0000 0011 001.\n\
+\t\t   0,    0, 31, //  65  0000 0011 010.\n\
+\t\t   0,    0, 30, //  66  0000 0011 011.\n\
+\t\t   0,    0, 29, //  67  0000 0011 100.\n\
+\t\t   0,    0, 28, //  68  0000 0011 101.\n\
+\t\t   0,    0, 27, //  69  0000 0011 110.\n\
+\t\t   0,    0, 26, //  70  0000 0011 111.\n\
+\t\t   0,    0, 25, //  71  0000 0100 000.\n\
+\t\t   0,    0, 24, //  72  0000 0100 001.\n\
+\t\t   0,    0, 23, //  73  0000 0100 010.\n\
+\t\t   0,    0, 22  //  74  0000 0100 011.\n\
+\t]),\n\
+\t\n\
+\t//  macroblock_type bitmap:\n\
+\t//    0x10  macroblock_quant\n\
+\t//    0x08  macroblock_motion_forward\n\
+\t//    0x04  macroblock_motion_backward\n\
+\t//    0x02  macrobkock_pattern\n\
+\t//    0x01  macroblock_intra\n\
+\t//\n\
+\t\n\
+\tMACROBLOCK_TYPE_I = new Int8Array([\n\
+\t\t 1*3,  2*3,     0, //   0\n\
+\t\t  -1,  3*3,     0, //   1  0\n\
+\t\t   0,    0,  0x01, //   2  1.\n\
+\t\t   0,    0,  0x11  //   3  01.\n\
+\t]),\n\
+\t\n\
+\tMACROBLOCK_TYPE_P = new Int8Array([\n\
+\t\t 1*3,  2*3,     0, //  0\n\
+\t\t 3*3,  4*3,     0, //  1  0\n\
+\t\t   0,    0,  0x0a, //  2  1.\n\
+\t\t 5*3,  6*3,     0, //  3  00\n\
+\t\t   0,    0,  0x02, //  4  01.\n\
+\t\t 7*3,  8*3,     0, //  5  000\n\
+\t\t   0,    0,  0x08, //  6  001.\n\
+\t\t 9*3, 10*3,     0, //  7  0000\n\
+\t\t11*3, 12*3,     0, //  8  0001\n\
+\t\t  -1, 13*3,     0, //  9  00000\n\
+\t\t   0,    0,  0x12, // 10  00001.\n\
+\t\t   0,    0,  0x1a, // 11  00010.\n\
+\t\t   0,    0,  0x01, // 12  00011.\n\
+\t\t   0,    0,  0x11  // 13  000001.\n\
+\t]),\n\
+\t\n\
+\tMACROBLOCK_TYPE_B = new Int8Array([\n\
+\t\t 1*3,  2*3,     0,  //  0\n\
+\t\t 3*3,  5*3,     0,  //  1  0\n\
+\t\t 4*3,  6*3,     0,  //  2  1\n\
+\t\t 8*3,  7*3,     0,  //  3  00\n\
+\t\t   0,    0,  0x0c,  //  4  10.\n\
+\t\t 9*3, 10*3,     0,  //  5  01\n\
+\t\t   0,    0,  0x0e,  //  6  11.\n\
+\t\t13*3, 14*3,     0,  //  7  001\n\
+\t\t12*3, 11*3,     0,  //  8  000\n\
+\t\t   0,    0,  0x04,  //  9  010.\n\
+\t\t   0,    0,  0x06,  // 10  011.\n\
+\t\t18*3, 16*3,     0,  // 11  0001\n\
+\t\t15*3, 17*3,     0,  // 12  0000\n\
+\t\t   0,    0,  0x08,  // 13  0010.\n\
+\t\t   0,    0,  0x0a,  // 14  0011.\n\
+\t\t  -1, 19*3,     0,  // 15  00000\n\
+\t\t   0,    0,  0x01,  // 16  00011.\n\
+\t\t20*3, 21*3,     0,  // 17  00001\n\
+\t\t   0,    0,  0x1e,  // 18  00010.\n\
+\t\t   0,    0,  0x11,  // 19  000001.\n\
+\t\t   0,    0,  0x16,  // 20  000010.\n\
+\t\t   0,    0,  0x1a   // 21  000011.\n\
+\t]),\n\
+\t\n\
+\tCODE_BLOCK_PATTERN = new Int16Array([\n\
+\t\t  2*3,   1*3,   0,  //   0\n\
+\t\t  3*3,   6*3,   0,  //   1  1\n\
+\t\t  4*3,   5*3,   0,  //   2  0\n\
+\t\t  8*3,  11*3,   0,  //   3  10\n\
+\t\t 12*3,  13*3,   0,  //   4  00\n\
+\t\t  9*3,   7*3,   0,  //   5  01\n\
+\t\t 10*3,  14*3,   0,  //   6  11\n\
+\t\t 20*3,  19*3,   0,  //   7  011\n\
+\t\t 18*3,  16*3,   0,  //   8  100\n\
+\t\t 23*3,  17*3,   0,  //   9  010\n\
+\t\t 27*3,  25*3,   0,  //  10  110\n\
+\t\t 21*3,  28*3,   0,  //  11  101\n\
+\t\t 15*3,  22*3,   0,  //  12  000\n\
+\t\t 24*3,  26*3,   0,  //  13  001\n\
+\t\t    0,     0,  60,  //  14  111.\n\
+\t\t 35*3,  40*3,   0,  //  15  0000\n\
+\t\t 44*3,  48*3,   0,  //  16  1001\n\
+\t\t 38*3,  36*3,   0,  //  17  0101\n\
+\t\t 42*3,  47*3,   0,  //  18  1000\n\
+\t\t 29*3,  31*3,   0,  //  19  0111\n\
+\t\t 39*3,  32*3,   0,  //  20  0110\n\
+\t\t    0,     0,  32,  //  21  1010.\n\
+\t\t 45*3,  46*3,   0,  //  22  0001\n\
+\t\t 33*3,  41*3,   0,  //  23  0100\n\
+\t\t 43*3,  34*3,   0,  //  24  0010\n\
+\t\t    0,     0,   4,  //  25  1101.\n\
+\t\t 30*3,  37*3,   0,  //  26  0011\n\
+\t\t    0,     0,   8,  //  27  1100.\n\
+\t\t    0,     0,  16,  //  28  1011.\n\
+\t\t    0,     0,  44,  //  29  0111 0.\n\
+\t\t 50*3,  56*3,   0,  //  30  0011 0\n\
+\t\t    0,     0,  28,  //  31  0111 1.\n\
+\t\t    0,     0,  52,  //  32  0110 1.\n\
+\t\t    0,     0,  62,  //  33  0100 0.\n\
+\t\t 61*3,  59*3,   0,  //  34  0010 1\n\
+\t\t 52*3,  60*3,   0,  //  35  0000 0\n\
+\t\t    0,     0,   1,  //  36  0101 1.\n\
+\t\t 55*3,  54*3,   0,  //  37  0011 1\n\
+\t\t    0,     0,  61,  //  38  0101 0.\n\
+\t\t    0,     0,  56,  //  39  0110 0.\n\
+\t\t 57*3,  58*3,   0,  //  40  0000 1\n\
+\t\t    0,     0,   2,  //  41  0100 1.\n\
+\t\t    0,     0,  40,  //  42  1000 0.\n\
+\t\t 51*3,  62*3,   0,  //  43  0010 0\n\
+\t\t    0,     0,  48,  //  44  1001 0.\n\
+\t\t 64*3,  63*3,   0,  //  45  0001 0\n\
+\t\t 49*3,  53*3,   0,  //  46  0001 1\n\
+\t\t    0,     0,  20,  //  47  1000 1.\n\
+\t\t    0,     0,  12,  //  48  1001 1.\n\
+\t\t 80*3,  83*3,   0,  //  49  0001 10\n\
+\t\t    0,     0,  63,  //  50  0011 00.\n\
+\t\t 77*3,  75*3,   0,  //  51  0010 00\n\
+\t\t 65*3,  73*3,   0,  //  52  0000 00\n\
+\t\t 84*3,  66*3,   0,  //  53  0001 11\n\
+\t\t    0,     0,  24,  //  54  0011 11.\n\
+\t\t    0,     0,  36,  //  55  0011 10.\n\
+\t\t    0,     0,   3,  //  56  0011 01.\n\
+\t\t 69*3,  87*3,   0,  //  57  0000 10\n\
+\t\t 81*3,  79*3,   0,  //  58  0000 11\n\
+\t\t 68*3,  71*3,   0,  //  59  0010 11\n\
+\t\t 70*3,  78*3,   0,  //  60  0000 01\n\
+\t\t 67*3,  76*3,   0,  //  61  0010 10\n\
+\t\t 72*3,  74*3,   0,  //  62  0010 01\n\
+\t\t 86*3,  85*3,   0,  //  63  0001 01\n\
+\t\t 88*3,  82*3,   0,  //  64  0001 00\n\
+\t\t   -1,  94*3,   0,  //  65  0000 000\n\
+\t\t 95*3,  97*3,   0,  //  66  0001 111\n\
+\t\t    0,     0,  33,  //  67  0010 100.\n\
+\t\t    0,     0,   9,  //  68  0010 110.\n\
+\t\t106*3, 110*3,   0,  //  69  0000 100\n\
+\t\t102*3, 116*3,   0,  //  70  0000 010\n\
+\t\t    0,     0,   5,  //  71  0010 111.\n\
+\t\t    0,     0,  10,  //  72  0010 010.\n\
+\t\t 93*3,  89*3,   0,  //  73  0000 001\n\
+\t\t    0,     0,   6,  //  74  0010 011.\n\
+\t\t    0,     0,  18,  //  75  0010 001.\n\
+\t\t    0,     0,  17,  //  76  0010 101.\n\
+\t\t    0,     0,  34,  //  77  0010 000.\n\
+\t\t113*3, 119*3,   0,  //  78  0000 011\n\
+\t\t103*3, 104*3,   0,  //  79  0000 111\n\
+\t\t 90*3,  92*3,   0,  //  80  0001 100\n\
+\t\t109*3, 107*3,   0,  //  81  0000 110\n\
+\t\t117*3, 118*3,   0,  //  82  0001 001\n\
+\t\t101*3,  99*3,   0,  //  83  0001 101\n\
+\t\t 98*3,  96*3,   0,  //  84  0001 110\n\
+\t\t100*3,  91*3,   0,  //  85  0001 011\n\
+\t\t114*3, 115*3,   0,  //  86  0001 010\n\
+\t\t105*3, 108*3,   0,  //  87  0000 101\n\
+\t\t112*3, 111*3,   0,  //  88  0001 000\n\
+\t\t121*3, 125*3,   0,  //  89  0000 0011\n\
+\t\t    0,     0,  41,  //  90  0001 1000.\n\
+\t\t    0,     0,  14,  //  91  0001 0111.\n\
+\t\t    0,     0,  21,  //  92  0001 1001.\n\
+\t\t124*3, 122*3,   0,  //  93  0000 0010\n\
+\t\t120*3, 123*3,   0,  //  94  0000 0001\n\
+\t\t    0,     0,  11,  //  95  0001 1110.\n\
+\t\t    0,     0,  19,  //  96  0001 1101.\n\
+\t\t    0,     0,   7,  //  97  0001 1111.\n\
+\t\t    0,     0,  35,  //  98  0001 1100.\n\
+\t\t    0,     0,  13,  //  99  0001 1011.\n\
+\t\t    0,     0,  50,  // 100  0001 0110.\n\
+\t\t    0,     0,  49,  // 101  0001 1010.\n\
+\t\t    0,     0,  58,  // 102  0000 0100.\n\
+\t\t    0,     0,  37,  // 103  0000 1110.\n\
+\t\t    0,     0,  25,  // 104  0000 1111.\n\
+\t\t    0,     0,  45,  // 105  0000 1010.\n\
+\t\t    0,     0,  57,  // 106  0000 1000.\n\
+\t\t    0,     0,  26,  // 107  0000 1101.\n\
+\t\t    0,     0,  29,  // 108  0000 1011.\n\
+\t\t    0,     0,  38,  // 109  0000 1100.\n\
+\t\t    0,     0,  53,  // 110  0000 1001.\n\
+\t\t    0,     0,  23,  // 111  0001 0001.\n\
+\t\t    0,     0,  43,  // 112  0001 0000.\n\
+\t\t    0,     0,  46,  // 113  0000 0110.\n\
+\t\t    0,     0,  42,  // 114  0001 0100.\n\
+\t\t    0,     0,  22,  // 115  0001 0101.\n\
+\t\t    0,     0,  54,  // 116  0000 0101.\n\
+\t\t    0,     0,  51,  // 117  0001 0010.\n\
+\t\t    0,     0,  15,  // 118  0001 0011.\n\
+\t\t    0,     0,  30,  // 119  0000 0111.\n\
+\t\t    0,     0,  39,  // 120  0000 0001 0.\n\
+\t\t    0,     0,  47,  // 121  0000 0011 0.\n\
+\t\t    0,     0,  55,  // 122  0000 0010 1.\n\
+\t\t    0,     0,  27,  // 123  0000 0001 1.\n\
+\t\t    0,     0,  59,  // 124  0000 0010 0.\n\
+\t\t    0,     0,  31   // 125  0000 0011 1.\n\
+\t]),\n\
+\t\n\
+\tMOTION = new Int16Array([\n\
+\t\t  1*3,   2*3,   0,  //   0\n\
+\t\t  4*3,   3*3,   0,  //   1  0\n\
+\t\t    0,     0,   0,  //   2  1.\n\
+\t\t  6*3,   5*3,   0,  //   3  01\n\
+\t\t  8*3,   7*3,   0,  //   4  00\n\
+\t\t    0,     0,  -1,  //   5  011.\n\
+\t\t    0,     0,   1,  //   6  010.\n\
+\t\t  9*3,  10*3,   0,  //   7  001\n\
+\t\t 12*3,  11*3,   0,  //   8  000\n\
+\t\t    0,     0,   2,  //   9  0010.\n\
+\t\t    0,     0,  -2,  //  10  0011.\n\
+\t\t 14*3,  15*3,   0,  //  11  0001\n\
+\t\t 16*3,  13*3,   0,  //  12  0000\n\
+\t\t 20*3,  18*3,   0,  //  13  0000 1\n\
+\t\t    0,     0,   3,  //  14  0001 0.\n\
+\t\t    0,     0,  -3,  //  15  0001 1.\n\
+\t\t 17*3,  19*3,   0,  //  16  0000 0\n\
+\t\t   -1,  23*3,   0,  //  17  0000 00\n\
+\t\t 27*3,  25*3,   0,  //  18  0000 11\n\
+\t\t 26*3,  21*3,   0,  //  19  0000 01\n\
+\t\t 24*3,  22*3,   0,  //  20  0000 10\n\
+\t\t 32*3,  28*3,   0,  //  21  0000 011\n\
+\t\t 29*3,  31*3,   0,  //  22  0000 101\n\
+\t\t   -1,  33*3,   0,  //  23  0000 001\n\
+\t\t 36*3,  35*3,   0,  //  24  0000 100\n\
+\t\t    0,     0,  -4,  //  25  0000 111.\n\
+\t\t 30*3,  34*3,   0,  //  26  0000 010\n\
+\t\t    0,     0,   4,  //  27  0000 110.\n\
+\t\t    0,     0,  -7,  //  28  0000 0111.\n\
+\t\t    0,     0,   5,  //  29  0000 1010.\n\
+\t\t 37*3,  41*3,   0,  //  30  0000 0100\n\
+\t\t    0,     0,  -5,  //  31  0000 1011.\n\
+\t\t    0,     0,   7,  //  32  0000 0110.\n\
+\t\t 38*3,  40*3,   0,  //  33  0000 0011\n\
+\t\t 42*3,  39*3,   0,  //  34  0000 0101\n\
+\t\t    0,     0,  -6,  //  35  0000 1001.\n\
+\t\t    0,     0,   6,  //  36  0000 1000.\n\
+\t\t 51*3,  54*3,   0,  //  37  0000 0100 0\n\
+\t\t 50*3,  49*3,   0,  //  38  0000 0011 0\n\
+\t\t 45*3,  46*3,   0,  //  39  0000 0101 1\n\
+\t\t 52*3,  47*3,   0,  //  40  0000 0011 1\n\
+\t\t 43*3,  53*3,   0,  //  41  0000 0100 1\n\
+\t\t 44*3,  48*3,   0,  //  42  0000 0101 0\n\
+\t\t    0,     0,  10,  //  43  0000 0100 10.\n\
+\t\t    0,     0,   9,  //  44  0000 0101 00.\n\
+\t\t    0,     0,   8,  //  45  0000 0101 10.\n\
+\t\t    0,     0,  -8,  //  46  0000 0101 11.\n\
+\t\t 57*3,  66*3,   0,  //  47  0000 0011 11\n\
+\t\t    0,     0,  -9,  //  48  0000 0101 01.\n\
+\t\t 60*3,  64*3,   0,  //  49  0000 0011 01\n\
+\t\t 56*3,  61*3,   0,  //  50  0000 0011 00\n\
+\t\t 55*3,  62*3,   0,  //  51  0000 0100 00\n\
+\t\t 58*3,  63*3,   0,  //  52  0000 0011 10\n\
+\t\t    0,     0, -10,  //  53  0000 0100 11.\n\
+\t\t 59*3,  65*3,   0,  //  54  0000 0100 01\n\
+\t\t    0,     0,  12,  //  55  0000 0100 000.\n\
+\t\t    0,     0,  16,  //  56  0000 0011 000.\n\
+\t\t    0,     0,  13,  //  57  0000 0011 110.\n\
+\t\t    0,     0,  14,  //  58  0000 0011 100.\n\
+\t\t    0,     0,  11,  //  59  0000 0100 010.\n\
+\t\t    0,     0,  15,  //  60  0000 0011 010.\n\
+\t\t    0,     0, -16,  //  61  0000 0011 001.\n\
+\t\t    0,     0, -12,  //  62  0000 0100 001.\n\
+\t\t    0,     0, -14,  //  63  0000 0011 101.\n\
+\t\t    0,     0, -15,  //  64  0000 0011 011.\n\
+\t\t    0,     0, -11,  //  65  0000 0100 011.\n\
+\t\t    0,     0, -13   //  66  0000 0011 111.\n\
+\t]),\n\
+\t\n\
+\tDCT_DC_SIZE_LUMINANCE = new Int8Array([\n\
+\t\t  2*3,   1*3, 0,  //   0\n\
+\t\t  6*3,   5*3, 0,  //   1  1\n\
+\t\t  3*3,   4*3, 0,  //   2  0\n\
+\t\t    0,     0, 1,  //   3  00.\n\
+\t\t    0,     0, 2,  //   4  01.\n\
+\t\t  9*3,   8*3, 0,  //   5  11\n\
+\t\t  7*3,  10*3, 0,  //   6  10\n\
+\t\t    0,     0, 0,  //   7  100.\n\
+\t\t 12*3,  11*3, 0,  //   8  111\n\
+\t\t    0,     0, 4,  //   9  110.\n\
+\t\t    0,     0, 3,  //  10  101.\n\
+\t\t 13*3,  14*3, 0,  //  11  1111\n\
+\t\t    0,     0, 5,  //  12  1110.\n\
+\t\t    0,     0, 6,  //  13  1111 0.\n\
+\t\t 16*3,  15*3, 0,  //  14  1111 1\n\
+\t\t 17*3,    -1, 0,  //  15  1111 11\n\
+\t\t    0,     0, 7,  //  16  1111 10.\n\
+\t\t    0,     0, 8   //  17  1111 110.\n\
+\t]),\n\
+\t\n\
+\tDCT_DC_SIZE_CHROMINANCE = new Int8Array([\n\
+\t\t  2*3,   1*3, 0,  //   0\n\
+\t\t  4*3,   3*3, 0,  //   1  1\n\
+\t\t  6*3,   5*3, 0,  //   2  0\n\
+\t\t  8*3,   7*3, 0,  //   3  11\n\
+\t\t    0,     0, 2,  //   4  10.\n\
+\t\t    0,     0, 1,  //   5  01.\n\
+\t\t    0,     0, 0,  //   6  00.\n\
+\t\t 10*3,   9*3, 0,  //   7  111\n\
+\t\t    0,     0, 3,  //   8  110.\n\
+\t\t 12*3,  11*3, 0,  //   9  1111\n\
+\t\t    0,     0, 4,  //  10  1110.\n\
+\t\t 14*3,  13*3, 0,  //  11  1111 1\n\
+\t\t    0,     0, 5,  //  12  1111 0.\n\
+\t\t 16*3,  15*3, 0,  //  13  1111 11\n\
+\t\t    0,     0, 6,  //  14  1111 10.\n\
+\t\t 17*3,    -1, 0,  //  15  1111 111\n\
+\t\t    0,     0, 7,  //  16  1111 110.\n\
+\t\t    0,     0, 8   //  17  1111 1110.\n\
+\t]),\n\
+\t\n\
+\t//  dct_coeff bitmap:\n\
+\t//    0xff00  run\n\
+\t//    0x00ff  level\n\
+\t\n\
+\t//  Decoded values are unsigned. Sign bit follows in the stream.\n\
+\t\n\
+\t//  Interpretation of the value 0x0001\n\
+\t//    for dc_coeff_first:  run=0, level=1\n\
+\t//    for dc_coeff_next:   If the next bit is 1: run=0, level=1\n\
+\t//                         If the next bit is 0: end_of_block\n\
+\t\n\
+\t//  escape decodes as 0xffff.\n\
+\t\n\
+\tDCT_COEFF = new Int32Array([\n\
+\t\t  1*3,   2*3,      0,  //   0\n\
+\t\t  4*3,   3*3,      0,  //   1  0\n\
+\t\t    0,     0, 0x0001,  //   2  1.\n\
+\t\t  7*3,   8*3,      0,  //   3  01\n\
+\t\t  6*3,   5*3,      0,  //   4  00\n\
+\t\t 13*3,   9*3,      0,  //   5  001\n\
+\t\t 11*3,  10*3,      0,  //   6  000\n\
+\t\t 14*3,  12*3,      0,  //   7  010\n\
+\t\t    0,     0, 0x0101,  //   8  011.\n\
+\t\t 20*3,  22*3,      0,  //   9  0011\n\
+\t\t 18*3,  21*3,      0,  //  10  0001\n\
+\t\t 16*3,  19*3,      0,  //  11  0000\n\
+\t\t    0,     0, 0x0201,  //  12  0101.\n\
+\t\t 17*3,  15*3,      0,  //  13  0010\n\
+\t\t    0,     0, 0x0002,  //  14  0100.\n\
+\t\t    0,     0, 0x0003,  //  15  0010 1.\n\
+\t\t 27*3,  25*3,      0,  //  16  0000 0\n\
+\t\t 29*3,  31*3,      0,  //  17  0010 0\n\
+\t\t 24*3,  26*3,      0,  //  18  0001 0\n\
+\t\t 32*3,  30*3,      0,  //  19  0000 1\n\
+\t\t    0,     0, 0x0401,  //  20  0011 0.\n\
+\t\t 23*3,  28*3,      0,  //  21  0001 1\n\
+\t\t    0,     0, 0x0301,  //  22  0011 1.\n\
+\t\t    0,     0, 0x0102,  //  23  0001 10.\n\
+\t\t    0,     0, 0x0701,  //  24  0001 00.\n\
+\t\t    0,     0, 0xffff,  //  25  0000 01. -- escape\n\
+\t\t    0,     0, 0x0601,  //  26  0001 01.\n\
+\t\t 37*3,  36*3,      0,  //  27  0000 00\n\
+\t\t    0,     0, 0x0501,  //  28  0001 11.\n\
+\t\t 35*3,  34*3,      0,  //  29  0010 00\n\
+\t\t 39*3,  38*3,      0,  //  30  0000 11\n\
+\t\t 33*3,  42*3,      0,  //  31  0010 01\n\
+\t\t 40*3,  41*3,      0,  //  32  0000 10\n\
+\t\t 52*3,  50*3,      0,  //  33  0010 010\n\
+\t\t 54*3,  53*3,      0,  //  34  0010 001\n\
+\t\t 48*3,  49*3,      0,  //  35  0010 000\n\
+\t\t 43*3,  45*3,      0,  //  36  0000 001\n\
+\t\t 46*3,  44*3,      0,  //  37  0000 000\n\
+\t\t    0,     0, 0x0801,  //  38  0000 111.\n\
+\t\t    0,     0, 0x0004,  //  39  0000 110.\n\
+\t\t    0,     0, 0x0202,  //  40  0000 100.\n\
+\t\t    0,     0, 0x0901,  //  41  0000 101.\n\
+\t\t 51*3,  47*3,      0,  //  42  0010 011\n\
+\t\t 55*3,  57*3,      0,  //  43  0000 0010\n\
+\t\t 60*3,  56*3,      0,  //  44  0000 0001\n\
+\t\t 59*3,  58*3,      0,  //  45  0000 0011\n\
+\t\t 61*3,  62*3,      0,  //  46  0000 0000\n\
+\t\t    0,     0, 0x0a01,  //  47  0010 0111.\n\
+\t\t    0,     0, 0x0d01,  //  48  0010 0000.\n\
+\t\t    0,     0, 0x0006,  //  49  0010 0001.\n\
+\t\t    0,     0, 0x0103,  //  50  0010 0101.\n\
+\t\t    0,     0, 0x0005,  //  51  0010 0110.\n\
+\t\t    0,     0, 0x0302,  //  52  0010 0100.\n\
+\t\t    0,     0, 0x0b01,  //  53  0010 0011.\n\
+\t\t    0,     0, 0x0c01,  //  54  0010 0010.\n\
+\t\t 76*3,  75*3,      0,  //  55  0000 0010 0\n\
+\t\t 67*3,  70*3,      0,  //  56  0000 0001 1\n\
+\t\t 73*3,  71*3,      0,  //  57  0000 0010 1\n\
+\t\t 78*3,  74*3,      0,  //  58  0000 0011 1\n\
+\t\t 72*3,  77*3,      0,  //  59  0000 0011 0\n\
+\t\t 69*3,  64*3,      0,  //  60  0000 0001 0\n\
+\t\t 68*3,  63*3,      0,  //  61  0000 0000 0\n\
+\t\t 66*3,  65*3,      0,  //  62  0000 0000 1\n\
+\t\t 81*3,  87*3,      0,  //  63  0000 0000 01\n\
+\t\t 91*3,  80*3,      0,  //  64  0000 0001 01\n\
+\t\t 82*3,  79*3,      0,  //  65  0000 0000 11\n\
+\t\t 83*3,  86*3,      0,  //  66  0000 0000 10\n\
+\t\t 93*3,  92*3,      0,  //  67  0000 0001 10\n\
+\t\t 84*3,  85*3,      0,  //  68  0000 0000 00\n\
+\t\t 90*3,  94*3,      0,  //  69  0000 0001 00\n\
+\t\t 88*3,  89*3,      0,  //  70  0000 0001 11\n\
+\t\t    0,     0, 0x0203,  //  71  0000 0010 11.\n\
+\t\t    0,     0, 0x0104,  //  72  0000 0011 00.\n\
+\t\t    0,     0, 0x0007,  //  73  0000 0010 10.\n\
+\t\t    0,     0, 0x0402,  //  74  0000 0011 11.\n\
+\t\t    0,     0, 0x0502,  //  75  0000 0010 01.\n\
+\t\t    0,     0, 0x1001,  //  76  0000 0010 00.\n\
+\t\t    0,     0, 0x0f01,  //  77  0000 0011 01.\n\
+\t\t    0,     0, 0x0e01,  //  78  0000 0011 10.\n\
+\t\t105*3, 107*3,      0,  //  79  0000 0000 111\n\
+\t\t111*3, 114*3,      0,  //  80  0000 0001 011\n\
+\t\t104*3,  97*3,      0,  //  81  0000 0000 010\n\
+\t\t125*3, 119*3,      0,  //  82  0000 0000 110\n\
+\t\t 96*3,  98*3,      0,  //  83  0000 0000 100\n\
+\t\t   -1, 123*3,      0,  //  84  0000 0000 000\n\
+\t\t 95*3, 101*3,      0,  //  85  0000 0000 001\n\
+\t\t106*3, 121*3,      0,  //  86  0000 0000 101\n\
+\t\t 99*3, 102*3,      0,  //  87  0000 0000 011\n\
+\t\t113*3, 103*3,      0,  //  88  0000 0001 110\n\
+\t\t112*3, 116*3,      0,  //  89  0000 0001 111\n\
+\t\t110*3, 100*3,      0,  //  90  0000 0001 000\n\
+\t\t124*3, 115*3,      0,  //  91  0000 0001 010\n\
+\t\t117*3, 122*3,      0,  //  92  0000 0001 101\n\
+\t\t109*3, 118*3,      0,  //  93  0000 0001 100\n\
+\t\t120*3, 108*3,      0,  //  94  0000 0001 001\n\
+\t\t127*3, 136*3,      0,  //  95  0000 0000 0010\n\
+\t\t139*3, 140*3,      0,  //  96  0000 0000 1000\n\
+\t\t130*3, 126*3,      0,  //  97  0000 0000 0101\n\
+\t\t145*3, 146*3,      0,  //  98  0000 0000 1001\n\
+\t\t128*3, 129*3,      0,  //  99  0000 0000 0110\n\
+\t\t    0,     0, 0x0802,  // 100  0000 0001 0001.\n\
+\t\t132*3, 134*3,      0,  // 101  0000 0000 0011\n\
+\t\t155*3, 154*3,      0,  // 102  0000 0000 0111\n\
+\t\t    0,     0, 0x0008,  // 103  0000 0001 1101.\n\
+\t\t137*3, 133*3,      0,  // 104  0000 0000 0100\n\
+\t\t143*3, 144*3,      0,  // 105  0000 0000 1110\n\
+\t\t151*3, 138*3,      0,  // 106  0000 0000 1010\n\
+\t\t142*3, 141*3,      0,  // 107  0000 0000 1111\n\
+\t\t    0,     0, 0x000a,  // 108  0000 0001 0011.\n\
+\t\t    0,     0, 0x0009,  // 109  0000 0001 1000.\n\
+\t\t    0,     0, 0x000b,  // 110  0000 0001 0000.\n\
+\t\t    0,     0, 0x1501,  // 111  0000 0001 0110.\n\
+\t\t    0,     0, 0x0602,  // 112  0000 0001 1110.\n\
+\t\t    0,     0, 0x0303,  // 113  0000 0001 1100.\n\
+\t\t    0,     0, 0x1401,  // 114  0000 0001 0111.\n\
+\t\t    0,     0, 0x0702,  // 115  0000 0001 0101.\n\
+\t\t    0,     0, 0x1101,  // 116  0000 0001 1111.\n\
+\t\t    0,     0, 0x1201,  // 117  0000 0001 1010.\n\
+\t\t    0,     0, 0x1301,  // 118  0000 0001 1001.\n\
+\t\t148*3, 152*3,      0,  // 119  0000 0000 1101\n\
+\t\t    0,     0, 0x0403,  // 120  0000 0001 0010.\n\
+\t\t153*3, 150*3,      0,  // 121  0000 0000 1011\n\
+\t\t    0,     0, 0x0105,  // 122  0000 0001 1011.\n\
+\t\t131*3, 135*3,      0,  // 123  0000 0000 0001\n\
+\t\t    0,     0, 0x0204,  // 124  0000 0001 0100.\n\
+\t\t149*3, 147*3,      0,  // 125  0000 0000 1100\n\
+\t\t172*3, 173*3,      0,  // 126  0000 0000 0101 1\n\
+\t\t162*3, 158*3,      0,  // 127  0000 0000 0010 0\n\
+\t\t170*3, 161*3,      0,  // 128  0000 0000 0110 0\n\
+\t\t168*3, 166*3,      0,  // 129  0000 0000 0110 1\n\
+\t\t157*3, 179*3,      0,  // 130  0000 0000 0101 0\n\
+\t\t169*3, 167*3,      0,  // 131  0000 0000 0001 0\n\
+\t\t174*3, 171*3,      0,  // 132  0000 0000 0011 0\n\
+\t\t178*3, 177*3,      0,  // 133  0000 0000 0100 1\n\
+\t\t156*3, 159*3,      0,  // 134  0000 0000 0011 1\n\
+\t\t164*3, 165*3,      0,  // 135  0000 0000 0001 1\n\
+\t\t183*3, 182*3,      0,  // 136  0000 0000 0010 1\n\
+\t\t175*3, 176*3,      0,  // 137  0000 0000 0100 0\n\
+\t\t    0,     0, 0x0107,  // 138  0000 0000 1010 1.\n\
+\t\t    0,     0, 0x0a02,  // 139  0000 0000 1000 0.\n\
+\t\t    0,     0, 0x0902,  // 140  0000 0000 1000 1.\n\
+\t\t    0,     0, 0x1601,  // 141  0000 0000 1111 1.\n\
+\t\t    0,     0, 0x1701,  // 142  0000 0000 1111 0.\n\
+\t\t    0,     0, 0x1901,  // 143  0000 0000 1110 0.\n\
+\t\t    0,     0, 0x1801,  // 144  0000 0000 1110 1.\n\
+\t\t    0,     0, 0x0503,  // 145  0000 0000 1001 0.\n\
+\t\t    0,     0, 0x0304,  // 146  0000 0000 1001 1.\n\
+\t\t    0,     0, 0x000d,  // 147  0000 0000 1100 1.\n\
+\t\t    0,     0, 0x000c,  // 148  0000 0000 1101 0.\n\
+\t\t    0,     0, 0x000e,  // 149  0000 0000 1100 0.\n\
+\t\t    0,     0, 0x000f,  // 150  0000 0000 1011 1.\n\
+\t\t    0,     0, 0x0205,  // 151  0000 0000 1010 0.\n\
+\t\t    0,     0, 0x1a01,  // 152  0000 0000 1101 1.\n\
+\t\t    0,     0, 0x0106,  // 153  0000 0000 1011 0.\n\
+\t\t180*3, 181*3,      0,  // 154  0000 0000 0111 1\n\
+\t\t160*3, 163*3,      0,  // 155  0000 0000 0111 0\n\
+\t\t196*3, 199*3,      0,  // 156  0000 0000 0011 10\n\
+\t\t    0,     0, 0x001b,  // 157  0000 0000 0101 00.\n\
+\t\t203*3, 185*3,      0,  // 158  0000 0000 0010 01\n\
+\t\t202*3, 201*3,      0,  // 159  0000 0000 0011 11\n\
+\t\t    0,     0, 0x0013,  // 160  0000 0000 0111 00.\n\
+\t\t    0,     0, 0x0016,  // 161  0000 0000 0110 01.\n\
+\t\t197*3, 207*3,      0,  // 162  0000 0000 0010 00\n\
+\t\t    0,     0, 0x0012,  // 163  0000 0000 0111 01.\n\
+\t\t191*3, 192*3,      0,  // 164  0000 0000 0001 10\n\
+\t\t188*3, 190*3,      0,  // 165  0000 0000 0001 11\n\
+\t\t    0,     0, 0x0014,  // 166  0000 0000 0110 11.\n\
+\t\t184*3, 194*3,      0,  // 167  0000 0000 0001 01\n\
+\t\t    0,     0, 0x0015,  // 168  0000 0000 0110 10.\n\
+\t\t186*3, 193*3,      0,  // 169  0000 0000 0001 00\n\
+\t\t    0,     0, 0x0017,  // 170  0000 0000 0110 00.\n\
+\t\t204*3, 198*3,      0,  // 171  0000 0000 0011 01\n\
+\t\t    0,     0, 0x0019,  // 172  0000 0000 0101 10.\n\
+\t\t    0,     0, 0x0018,  // 173  0000 0000 0101 11.\n\
+\t\t200*3, 205*3,      0,  // 174  0000 0000 0011 00\n\
+\t\t    0,     0, 0x001f,  // 175  0000 0000 0100 00.\n\
+\t\t    0,     0, 0x001e,  // 176  0000 0000 0100 01.\n\
+\t\t    0,     0, 0x001c,  // 177  0000 0000 0100 11.\n\
+\t\t    0,     0, 0x001d,  // 178  0000 0000 0100 10.\n\
+\t\t    0,     0, 0x001a,  // 179  0000 0000 0101 01.\n\
+\t\t    0,     0, 0x0011,  // 180  0000 0000 0111 10.\n\
+\t\t    0,     0, 0x0010,  // 181  0000 0000 0111 11.\n\
+\t\t189*3, 206*3,      0,  // 182  0000 0000 0010 11\n\
+\t\t187*3, 195*3,      0,  // 183  0000 0000 0010 10\n\
+\t\t218*3, 211*3,      0,  // 184  0000 0000 0001 010\n\
+\t\t    0,     0, 0x0025,  // 185  0000 0000 0010 011.\n\
+\t\t215*3, 216*3,      0,  // 186  0000 0000 0001 000\n\
+\t\t    0,     0, 0x0024,  // 187  0000 0000 0010 100.\n\
+\t\t210*3, 212*3,      0,  // 188  0000 0000 0001 110\n\
+\t\t    0,     0, 0x0022,  // 189  0000 0000 0010 110.\n\
+\t\t213*3, 209*3,      0,  // 190  0000 0000 0001 111\n\
+\t\t221*3, 222*3,      0,  // 191  0000 0000 0001 100\n\
+\t\t219*3, 208*3,      0,  // 192  0000 0000 0001 101\n\
+\t\t217*3, 214*3,      0,  // 193  0000 0000 0001 001\n\
+\t\t223*3, 220*3,      0,  // 194  0000 0000 0001 011\n\
+\t\t    0,     0, 0x0023,  // 195  0000 0000 0010 101.\n\
+\t\t    0,     0, 0x010b,  // 196  0000 0000 0011 100.\n\
+\t\t    0,     0, 0x0028,  // 197  0000 0000 0010 000.\n\
+\t\t    0,     0, 0x010c,  // 198  0000 0000 0011 011.\n\
+\t\t    0,     0, 0x010a,  // 199  0000 0000 0011 101.\n\
+\t\t    0,     0, 0x0020,  // 200  0000 0000 0011 000.\n\
+\t\t    0,     0, 0x0108,  // 201  0000 0000 0011 111.\n\
+\t\t    0,     0, 0x0109,  // 202  0000 0000 0011 110.\n\
+\t\t    0,     0, 0x0026,  // 203  0000 0000 0010 010.\n\
+\t\t    0,     0, 0x010d,  // 204  0000 0000 0011 010.\n\
+\t\t    0,     0, 0x010e,  // 205  0000 0000 0011 001.\n\
+\t\t    0,     0, 0x0021,  // 206  0000 0000 0010 111.\n\
+\t\t    0,     0, 0x0027,  // 207  0000 0000 0010 001.\n\
+\t\t    0,     0, 0x1f01,  // 208  0000 0000 0001 1011.\n\
+\t\t    0,     0, 0x1b01,  // 209  0000 0000 0001 1111.\n\
+\t\t    0,     0, 0x1e01,  // 210  0000 0000 0001 1100.\n\
+\t\t    0,     0, 0x1002,  // 211  0000 0000 0001 0101.\n\
+\t\t    0,     0, 0x1d01,  // 212  0000 0000 0001 1101.\n\
+\t\t    0,     0, 0x1c01,  // 213  0000 0000 0001 1110.\n\
+\t\t    0,     0, 0x010f,  // 214  0000 0000 0001 0011.\n\
+\t\t    0,     0, 0x0112,  // 215  0000 0000 0001 0000.\n\
+\t\t    0,     0, 0x0111,  // 216  0000 0000 0001 0001.\n\
+\t\t    0,     0, 0x0110,  // 217  0000 0000 0001 0010.\n\
+\t\t    0,     0, 0x0603,  // 218  0000 0000 0001 0100.\n\
+\t\t    0,     0, 0x0b02,  // 219  0000 0000 0001 1010.\n\
+\t\t    0,     0, 0x0e02,  // 220  0000 0000 0001 0111.\n\
+\t\t    0,     0, 0x0d02,  // 221  0000 0000 0001 1000.\n\
+\t\t    0,     0, 0x0c02,  // 222  0000 0000 0001 1001.\n\
+\t\t    0,     0, 0x0f02   // 223  0000 0000 0001 0110.\n\
+\t]),\n\
+\t\n\
+\tPICTURE_TYPE_I = 1,\n\
+\tPICTURE_TYPE_P = 2,\n\
+\tPICTURE_TYPE_B = 3,\n\
+\tPICTURE_TYPE_D = 4,\n\
+\t\n\
+\tSTART_SEQUENCE = 0xB3,\n\
+\tSTART_SLICE_FIRST = 0x01,\n\
+\tSTART_SLICE_LAST = 0xAF,\n\
+\tSTART_PICTURE = 0x00,\n\
+\tSTART_EXTENSION = 0xB5,\n\
+\tSTART_USER_DATA = 0xB2;\n\
+\t\n\
+var MACROBLOCK_TYPE_TABLES = [\n\
+\tnull,\n\
+\tMACROBLOCK_TYPE_I,\n\
+\tMACROBLOCK_TYPE_P,\n\
+\tMACROBLOCK_TYPE_B\n\
+];\n\
+\n\
+\n\
+\n\
+// ----------------------------------------------------------------------------\n\
+// Bit Reader \n\
+\n\
+var BitReader = function(arrayBuffer) {\n\
+\tthis.bytes = new Uint8Array(arrayBuffer);\n\
+\tthis.length = this.bytes.length;\n\
+\tthis.writePos = this.bytes.length;\n\
+\tthis.index = 0;\n\
+};\n\
+\n\
+BitReader.NOT_FOUND = -1;\n\
+\n\
+BitReader.prototype.findNextMPEGStartCode = function() {\t\n\
+\tfor( var i = (this.index+7 >> 3); i < this.writePos; i++ ) {\n\
+\t\tif(\n\
+\t\t\tthis.bytes[i] == 0x00 &&\n\
+\t\t\tthis.bytes[i+1] == 0x00 &&\n\
+\t\t\tthis.bytes[i+2] == 0x01\n\
+\t\t) {\n\
+\t\t\tthis.index = (i+4) << 3;\n\
+\t\t\treturn this.bytes[i+3];\n\
+\t\t}\n\
+\t}\n\
+\tthis.index = (this.writePos << 3);\n\
+\treturn BitReader.NOT_FOUND;\n\
+};\n\
+\n\
+BitReader.prototype.nextBytesAreStartCode = function() {\n\
+\tvar i = (this.index+7 >> 3);\n\
+\treturn (\n\
+\t\ti >= this.writePos || (\n\
+\t\t\tthis.bytes[i] == 0x00 && \n\
+\t\t\tthis.bytes[i+1] == 0x00 &&\n\
+\t\t\tthis.bytes[i+2] == 0x01\n\
+\t\t)\n\
+\t);\n\
+};\n\
+\n\
+BitReader.prototype.nextBits = function(count) {\n\
+\tvar \n\
+\t\tbyteOffset = this.index >> 3,\n\
+\t\troom = (8 - this.index % 8);\n\
+\n\
+\tif( room >= count ) {\n\
+\t\treturn (this.bytes[byteOffset] >> (room - count)) & (0xff >> (8-count));\n\
+\t}\n\
+\n\
+\tvar \n\
+\t\tleftover = (this.index + count) % 8, // Leftover bits in last byte\n\
+\t\tend = (this.index + count -1) >> 3,\n\
+\t\tvalue = this.bytes[byteOffset] & (0xff >> (8-room)); // Fill out first byte\n\
+\n\
+\tfor( byteOffset++; byteOffset < end; byteOffset++ ) {\n\
+\t\tvalue <<= 8; // Shift and\n\
+\t\tvalue |= this.bytes[byteOffset]; // Put next byte\n\
+\t}\n\
+\n\
+\tif (leftover > 0) {\n\
+\t\tvalue <<= leftover; // Make room for remaining bits\n\
+\t\tvalue |= (this.bytes[byteOffset] >> (8 - leftover));\n\
+\t}\n\
+\telse {\n\
+\t\tvalue <<= 8;\n\
+\t\tvalue |= this.bytes[byteOffset];\n\
+\t}\n\
+\t\n\
+\treturn value;\n\
+};\n\
+\n\
+BitReader.prototype.getBits = function(count) {\n\
+\tvar value = this.nextBits(count);\n\
+\tthis.index += count;\n\
+\treturn value;\n\
+};\n\
+\n\
+BitReader.prototype.advance = function(count) {\n\
+\treturn (this.index += count);\n\
+};\n\
+\n\
+BitReader.prototype.rewind = function(count) {\n\
+\treturn (this.index -= count);\n\
+};\n\
+\t\n\
+})(window);\n\
+\n\
+//@ sourceURL=openautomation/lib/jsmpg.js"
+));
 require.register("openautomation/lib/rest.js", Function("exports, require, module",
 "\n\
 /**\n\
@@ -11405,6 +13642,7 @@ var agent = require('superagent');\n\
 var SVG = require('svg.js').SVG;\n\
 var FastClick = require('fastclick').FastClick;\n\
 var drawing = SVG('sprites').fixSubPixelOffset();\n\
+require('./lib/jsmpg');\n\
 \n\
 /**\n\
  * Angular stuff.\n\
@@ -11516,9 +13754,15 @@ app.controller('StepsController', function ($scope){\n\
  * Canvas.\n\
  */\n\
 \n\
-var video = document.getElementById('webcam');\n\
+//var video = document.getElementById('webcam');\n\
 var canvas = document.getElementById('canvas');\n\
 canvas.style.zIndex = 0;\n\
+//canvas.width = document.body.clientWidth;\n\
+//canvas.height = document.body.clientHeight;\n\
+\n\
+// Setup the WebSocket connection and start the player\n\
+var client = new WebSocket('ws://98.234.56.154:8084/');\t\t//TODO: get local/external IP address\n\
+var player = new jsmpeg(client, {canvas:canvas});\n\
 \n\
 /**\n\
  * Hardcoded lab box dimensions.\n\
@@ -11540,9 +13784,9 @@ events.bind(window, 'clicks', function(e){\n\
     document.querySelector('.viewport').style.display = 'none';\n\
     document.querySelector('.editor').style.display = 'none';\n\
     //canvas.style.webkitFilter = '';\n\
-    video.play();\n\
+    //video.play();\n\
   } else {\n\
-    video.pause();\n\
+    //video.pause();\n\
     //document.querySelector('.snapshot').style.backgroundImage = 'url(' + canvas.toDataURL() + ');';\n\
     document.querySelector('.snapshot').src = canvas.toDataURL('image/webp', 0.001);\n\
     document.querySelector('.viewport').style.display = 'block';\n\
@@ -11574,7 +13818,7 @@ function sendMove(remote) {\n\
     });\n\
 }\n\
 \n\
-navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;\n\
+/*navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;\n\
 \n\
 // http://inspirit.github.io/jsfeat/js/compatibility.js\n\
 navigator.getUserMedia({ video: true }, function(stream){\n\
@@ -11588,10 +13832,10 @@ navigator.getUserMedia({ video: true }, function(stream){\n\
   setTimeout(start, 500);\n\
 }, function(){\n\
   console.log(arguments);\n\
-});\n\
+});*/\n\
 \n\
 function start() {\n\
-  video.play();\n\
+  //video.play();\n\
   demo_app();\n\
   requestAnimationFrame(tick);\n\
   return;\n\
@@ -11606,7 +13850,7 @@ function start() {\n\
 \n\
   var liquid = new LiquidContainer(drawing);\n\
 }\n\
-\n\
+/*\n\
 function success(stream) {\n\
   try {\n\
     video.src = webkitURL.createObjectURL(stream);\n\
@@ -11621,6 +13865,7 @@ function failure(err) {\n\
   $('#no_rtc').html('<h4>WebRTC not available.</h4>');\n\
   $('#no_rtc').show();\n\
 }\n\
+*/\n\
 \n\
 var gui,options,ctx,canvasWidth,canvasHeight;\n\
 var img_u8;\n\
@@ -11640,7 +13885,7 @@ var imageData;\n\
 function tick() {\n\
   requestAnimationFrame(tick);\n\
 \n\
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {\n\
+  /*if (video.readyState === video.HAVE_ENOUGH_DATA) {\n\
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);\n\
     imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);\n\
     return;\n\
@@ -11661,8 +13906,9 @@ function tick() {\n\
     }\n\
     \n\
     ctx.putImageData(imageData, 0, 0);\n\
-  }\n\
-}//@ sourceURL=openautomation/index.js"
+  }*/\n\
+}\n\
+//@ sourceURL=openautomation/index.js"
 ));
 
 

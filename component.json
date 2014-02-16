@@ -27,6 +27,7 @@
   "license": "MIT",
   "main": "index.js",
   "scripts": [
+    "lib/jsmpg.js",
     "lib/rest.js",
     "lib/sprite.js",
     "lib/microplate.js",
