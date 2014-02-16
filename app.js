@@ -11,6 +11,7 @@ var favicon = require('koa-favicon');
 var compress = require('koa-compress');
 var index = require('./routes');
 var actions = require('./routes/action');
+var actions = require('./routes/video');
 var spawn = require('child_process').spawn;
 
 /**
@@ -35,6 +36,7 @@ app.use(compress({
 app.use(serve('public/'))
 app.use(route.get('/', index));
 app.use(route.post('/run', actions.create));
+app.use(route.get('/video-stream.mp4', video.stream));
 
 /**
  * Video streaming to client.
