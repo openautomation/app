@@ -16,7 +16,7 @@ var SVG = require('svg.js').SVG;
 var FastClick = require('fastclick').FastClick;
 var drawing = SVG('sprites').fixSubPixelOffset();
 require('./lib/jsmpg');
-
+console.log('after');
 /**
  * Angular stuff.
  */
@@ -34,7 +34,7 @@ var Microplate = require('./lib/microplate');
 var LiquidContainer = require('./lib/liquid-container');
 var PetriDish = require('./lib/petri-dish');
 
-require('live-css').start();
+//require('live-css').start();
 
 app.controller('StepsController', function ($scope){
   $scope.view = 'steps';
@@ -134,7 +134,8 @@ canvas.style.zIndex = 0;
 //canvas.height = document.body.clientHeight;
 
 // Setup the WebSocket connection and start the player
-var client = new WebSocket('ws://98.234.56.154:8084/');		//TODO: get local/external IP address
+var client = new WebSocket('ws://192.168.34.168:8084/');		//TODO: get local/external IP address
+console.log('created websocket client');
 var player = new jsmpeg(client, {canvas:canvas});
 
 /**
