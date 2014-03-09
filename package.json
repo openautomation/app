@@ -18,7 +18,8 @@
     "koa-response-time": "~1.0.1",
     "koa-compress": "~1.0.2",
     "zlib": "~1.0.5",
-    "koa-favicon": "~1.0.1"
+    "koa-favicon": "~1.0.1",
+    "nodejs-websocket": "~0.1.4"
   },
   "engines": {
     "node": "0.11.x"

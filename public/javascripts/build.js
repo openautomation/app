@@ -1796,7 +1796,7 @@ module.exports = request;\n\
 //@ sourceURL=visionmedia-superagent/lib/client.js"
 ));
 require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
-"/* svg.js 1.0.0-rc.4-9-g6841c32 - svg inventor regex default color array pointarray patharray number viewbox bbox rbox element parent container fx relative event defs group arrange mask clip gradient pattern doc shape use rect ellipse line poly path image text textpath nested hyperlink sugar set data memory loader - svgjs.com/license */\n\
+"/* svg.js 1.0.0-rc.5 - svg inventor regex default color array pointarray patharray number viewbox bbox rbox element parent container fx relative event defs group arrange mask clip gradient pattern doc shape use rect ellipse line poly path image text textpath nested hyperlink sugar set data memory loader - svgjs.com/license */\n\
 ;(function() {\n\
 \n\
   this.SVG = function(element) {\n\
@@ -1865,13 +1865,17 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     /* select document body and create invisible svg element */\n\
     var body = document.getElementsByTagName('body')[0]\n\
       , draw = (body ? new SVG.Doc(body) : element.nested()).size(2, 2)\n\
+      , path = SVG.create('path')\n\
+  \n\
+    /* insert parsers */\n\
+    draw.node.appendChild(path)\n\
   \n\
     /* create parser object */\n\
     SVG.parser = {\n\
       body: body || element.parent\n\
     , draw: draw.style('opacity:0;position:fixed;left:100%;top:100%;overflow:hidden')\n\
-    , poly: draw.polygon().node\n\
-    , path: draw.path().node\n\
+    , poly: draw.polyline().node\n\
+    , path: path\n\
     }\n\
   }\n\
   \n\
@@ -1930,9 +1934,6 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     /* test css declaration */\n\
   , isCss:        /[^:]+:[^;]+;?/\n\
     \n\
-    /* test css property */\n\
-  , isStyle:      /^font|text|leading|cursor/\n\
-    \n\
     /* test for blank string */\n\
   , isBlank:      /^(\\s+)?$/\n\
     \n\
@@ -1978,6 +1979,10 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     , offset:             0\n\
     , 'stop-opacity':     1\n\
     , 'stop-color':       '#000000'\n\
+      /* text */\n\
+    , 'font-size':        16\n\
+    , 'font-family':      'Helvetica, Arial, sans-serif'\n\
+    , 'text-anchor':      'start'\n\
     }\n\
     \n\
     // Default transformation values\n\
@@ -2278,8 +2283,6 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     }\n\
     // Get bounding box of points\n\
   , bbox: function() {\n\
-      if (this._cachedBBox) return this._cachedBBox\n\
-  \n\
       SVG.parser.poly.setAttribute('points', this.toString())\n\
   \n\
       return SVG.parser.poly.getBBox()\n\
@@ -2297,48 +2300,7 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   SVG.extend(SVG.PathArray, {\n\
     // Convert array to string\n\
     toString: function() {\n\
-      for (var s, i = 0, il = this.value.length, array = []; i < il; i++) {\n\
-        s = [this.value[i].type]\n\
-        \n\
-        switch(this.value[i].type) {\n\
-          case 'H':\n\
-            s.push(this.value[i].x)\n\
-          break\n\
-          case 'V':\n\
-            s.push(this.value[i].y)\n\
-          break\n\
-          case 'M':\n\
-          case 'L':\n\
-          case 'T':\n\
-          case 'S':\n\
-          case 'Q':\n\
-          case 'C':\n\
-            if (/[QC]/.test(this.value[i].type))\n\
-              s.push(this.value[i].x1, this.value[i].y1)\n\
-            if (/[CS]/.test(this.value[i].type))\n\
-              s.push(this.value[i].x2, this.value[i].y2)\n\
-  \n\
-            s.push(this.value[i].x, this.value[i].y)\n\
-  \n\
-          break\n\
-          case 'A':\n\
-            s.push(\n\
-              this.value[i].r1\n\
-            , this.value[i].r2\n\
-            , this.value[i].a\n\
-            , this.value[i].l\n\
-            , this.value[i].s\n\
-            , this.value[i].x\n\
-            , this.value[i].y\n\
-            )\n\
-          break\n\
-        }\n\
-  \n\
-        /* add to array */\n\
-        array.push(s.join(' '))\n\
-      }\n\
-      \n\
-      return array.join(' ')\n\
+      return arrayToString(this.value)\n\
     }\n\
     // Move path string\n\
   , move: function(x, y) {\n\
@@ -2351,45 +2313,35 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
       if (!isNaN(x) && !isNaN(y)) {\n\
         /* move every point */\n\
-        for (var i = this.value.length - 1; i >= 0; i--) {\n\
-          switch (this.value[i].type) {\n\
-            case 'H':\n\
-              /* move along x axis only */\n\
-              this.value[i].x += x\n\
-            break\n\
-            case 'V':\n\
-              /* move along y axis only */\n\
-              this.value[i].y += y\n\
-            break\n\
-            case 'M':\n\
-            case 'L':\n\
-            case 'T':\n\
-            case 'S':\n\
-            case 'Q':\n\
-            case 'C':\n\
-              /* move first point along x and y axes */\n\
-              this.value[i].x += x\n\
-              this.value[i].y += y\n\
+        for (var l, i = this.value.length - 1; i >= 0; i--) {\n\
+          l = this.value[i][0]\n\
   \n\
-              /* move third points along x and y axes */\n\
-              if (/[CQ]/.test(this.value[i].type)) {\n\
-                this.value[i].x1 += x\n\
-                this.value[i].y1 += y\n\
-              }\n\
+          if (l == 'M' || l == 'L' || l == 'T')  {\n\
+            this.value[i][1] += x\n\
+            this.value[i][2] += y\n\
   \n\
-              /* move second points along x and y axes */\n\
-              if (/[CS]/.test(this.value[i].type)) {\n\
-                this.value[i].x2 += x\n\
-                this.value[i].y2 += y\n\
-              }\n\
+          } else if (l == 'H')  {\n\
+            this.value[i][1] += x\n\
   \n\
-            break\n\
-            case 'A':\n\
-              /* only move position values */\n\
-              this.value[i].x += x\n\
-              this.value[i].y += y\n\
-            break\n\
+          } else if (l == 'V')  {\n\
+            this.value[i][1] += y\n\
+  \n\
+          } else if (l == 'C' || l == 'S' || l == 'Q')  {\n\
+            this.value[i][1] += x\n\
+            this.value[i][2] += y\n\
+            this.value[i][3] += x\n\
+            this.value[i][4] += y\n\
+  \n\
+            if (l == 'C')  {\n\
+              this.value[i][5] += x\n\
+              this.value[i][6] += y\n\
+            }\n\
+  \n\
+          } else if (l == 'A')  {\n\
+            this.value[i][6] += x\n\
+            this.value[i][7] += y\n\
           }\n\
+  \n\
         }\n\
       }\n\
   \n\
@@ -2398,61 +2350,51 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     // Resize path string\n\
   , size: function(width, height) {\n\
   \t\t/* get bounding box of current situation */\n\
-  \t\tvar box = this.bbox()\n\
+  \t\tvar i, l, box = this.bbox()\n\
   \n\
       /* recalculate position of all points according to new size */\n\
-      for (var i = this.value.length - 1; i >= 0; i--) {\n\
-        switch (this.value[i].type) {\n\
-          case 'H':\n\
-            /* move along x axis only */\n\
-            this.value[i].x = ((this.value[i].x - box.x) * width)  / box.width  + box.x\n\
-          break\n\
-          case 'V':\n\
-            /* move along y axis only */\n\
-            this.value[i].y = ((this.value[i].y - box.y) * height) / box.height + box.y\n\
-          break\n\
-          case 'M':\n\
-          case 'L':\n\
-          case 'T':\n\
-          case 'S':\n\
-          case 'Q':\n\
-          case 'C':\n\
-            this.value[i].x = ((this.value[i].x - box.x) * width)  / box.width  + box.x\n\
-            this.value[i].y = ((this.value[i].y - box.y) * height) / box.height + box.y\n\
+      for (i = this.value.length - 1; i >= 0; i--) {\n\
+        l = this.value[i][0]\n\
   \n\
-            /* move third points along x and y axes */\n\
-            if (/[CQ]/.test(this.value[i].type)) {\n\
-              this.value[i].x1 = ((this.value[i].x1 - box.x) * width)  / box.width  + box.x\n\
-              this.value[i].y1 = ((this.value[i].y1 - box.y) * height) / box.height + box.y\n\
-            }\n\
+        if (l == 'M' || l == 'L' || l == 'T')  {\n\
+          this.value[i][1] = ((this.value[i][1] - box.x) * width)  / box.width  + box.x\n\
+          this.value[i][2] = ((this.value[i][2] - box.y) * height) / box.height + box.y\n\
   \n\
-            /* move second points along x and y axes */\n\
-            if (/[CS]/.test(this.value[i].type)) {\n\
-              this.value[i].x2 = ((this.value[i].x2 - box.x) * width)  / box.width  + box.x\n\
-              this.value[i].y2 = ((this.value[i].y2 - box.y) * height) / box.height + box.y\n\
-            }\n\
+        } else if (l == 'H')  {\n\
+          this.value[i][1] = ((this.value[i][1] - box.x) * width)  / box.width  + box.x\n\
   \n\
-          break\n\
-          case 'A':\n\
-            /* resize radii */\n\
-            this.value[i].values.r1 = (this.value[i].values.r1 * width)  / box.width\n\
-            this.value[i].values.r2 = (this.value[i].values.r2 * height) / box.height\n\
+        } else if (l == 'V')  {\n\
+          this.value[i][1] = ((this.value[i][1] - box.y) * height) / box.height + box.y\n\
   \n\
-            /* move position values */\n\
-            this.value[i].values.x = ((this.value[i].values.x - box.x) * width)  / box.width  + box.x\n\
-            this.value[i].values.y = ((this.value[i].values.y - box.y) * height) / box.height + box.y\n\
-          break\n\
+        } else if (l == 'C' || l == 'S' || l == 'Q')  {\n\
+          this.value[i][1] = ((this.value[i][1] - box.x) * width)  / box.width  + box.x\n\
+          this.value[i][2] = ((this.value[i][2] - box.y) * height) / box.height + box.y\n\
+          this.value[i][3] = ((this.value[i][3] - box.x) * width)  / box.width  + box.x\n\
+          this.value[i][4] = ((this.value[i][4] - box.y) * height) / box.height + box.y\n\
+  \n\
+          if (l == 'C')  {\n\
+            this.value[i][5] = ((this.value[i][5] - box.x) * width)  / box.width  + box.x\n\
+            this.value[i][6] = ((this.value[i][6] - box.y) * height) / box.height + box.y\n\
+          }\n\
+  \n\
+        } else if (l == 'A')  {\n\
+          /* resize radii */\n\
+          this.value[i][1] = (this.value[i][1] * width)  / box.width\n\
+          this.value[i][2] = (this.value[i][2] * height) / box.height\n\
+  \n\
+          /* move position values */\n\
+          this.value[i][6] = ((this.value[i][6] - box.x) * width)  / box.width  + box.x\n\
+          this.value[i][7] = ((this.value[i][7] - box.y) * height) / box.height + box.y\n\
         }\n\
+  \n\
       }\n\
   \n\
       return this\n\
     }\n\
     // Absolutize and parse path to array\n\
   , parse: function(array) {\n\
-      array = array.valueOf()\n\
-  \n\
-      /* if already is an array, no need to parse it */\n\
-      if (Array.isArray(array)) return array\n\
+      /* if it's already is a patharray, no need to parse it */\n\
+      if (array instanceof SVG.PathArray) return array.valueOf()\n\
   \n\
       /* prepare for parsing */\n\
       var i, il, x0, y0, x1, y1, x2, y2, s, seg, segs\n\
@@ -2460,7 +2402,7 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
         , y = 0\n\
       \n\
       /* populate working path */\n\
-      SVG.parser.path.setAttribute('d', array)\n\
+      SVG.parser.path.setAttribute('d', typeof array === 'string' ? array : arrayToString(array))\n\
       \n\
       /* get segments */\n\
       segs = SVG.parser.path.pathSegList\n\
@@ -2469,7 +2411,8 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
         seg = segs.getItem(i)\n\
         s = seg.pathSegTypeAsLetter\n\
   \n\
-        if (/[MLHVCSQTA]/.test(s)) {\n\
+        /* yes, this IS quite verbose but also about 30 times faster than .test() with a precompiled regex */\n\
+        if (s == 'M' || s == 'L' || s == 'H' || s == 'V' || s == 'C' || s == 'S' || s == 'Q' || s == 'T' || s == 'A') {\n\
           if ('x' in seg) x = seg.x\n\
           if ('y' in seg) y = seg.y\n\
   \n\
@@ -2481,44 +2424,32 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
           if ('x'  in seg) x += seg.x\n\
           if ('y'  in seg) y += seg.y\n\
   \n\
-          switch(s){\n\
-            case 'm': \n\
-              segs.replaceItem(SVG.parser.path.createSVGPathSegMovetoAbs(x, y), i)\n\
-            break\n\
-            case 'l': \n\
-              segs.replaceItem(SVG.parser.path.createSVGPathSegLinetoAbs(x, y), i)\n\
-            break\n\
-            case 'h': \n\
-              segs.replaceItem(SVG.parser.path.createSVGPathSegLinetoHorizontalAbs(x), i)\n\
-            break\n\
-            case 'v': \n\
-              segs.replaceItem(SVG.parser.path.createSVGPathSegLinetoVerticalAbs(y), i)\n\
-            break\n\
-            case 'c': \n\
-              segs.replaceItem(SVG.parser.path.createSVGPathSegCurvetoCubicAbs(x, y, x1, y1, x2, y2), i)\n\
-            break\n\
-            case 's': \n\
-              segs.replaceItem(SVG.parser.path.createSVGPathSegCurvetoCubicSmoothAbs(x, y, x2, y2), i)\n\
-            break\n\
-            case 'q': \n\
-              segs.replaceItem(SVG.parser.path.createSVGPathSegCurvetoQuadraticAbs(x, y, x1, y1), i)\n\
-            break\n\
-            case 't': \n\
-              segs.replaceItem(SVG.parser.path.createSVGPathSegCurvetoQuadraticSmoothAbs(x, y), i)\n\
-            break\n\
-            case 'a': \n\
-              segs.replaceItem(SVG.parser.path.createSVGPathSegArcAbs(x, y, seg.r1, seg.r2, seg.angle, seg.largeArcFlag, seg.sweepFlag), i) \n\
-            break\n\
-            case 'z':\n\
-            case 'Z':\n\
-              x = x0\n\
-              y = y0\n\
-            break\n\
+          if (s == 'm')\n\
+            segs.replaceItem(SVG.parser.path.createSVGPathSegMovetoAbs(x, y), i)\n\
+          else if (s == 'l')\n\
+            segs.replaceItem(SVG.parser.path.createSVGPathSegLinetoAbs(x, y), i)\n\
+          else if (s == 'h')\n\
+            segs.replaceItem(SVG.parser.path.createSVGPathSegLinetoHorizontalAbs(x), i)\n\
+          else if (s == 'v')\n\
+            segs.replaceItem(SVG.parser.path.createSVGPathSegLinetoVerticalAbs(y), i)\n\
+          else if (s == 'c')\n\
+            segs.replaceItem(SVG.parser.path.createSVGPathSegCurvetoCubicAbs(x, y, x1, y1, x2, y2), i)\n\
+          else if (s == 's')\n\
+            segs.replaceItem(SVG.parser.path.createSVGPathSegCurvetoCubicSmoothAbs(x, y, x2, y2), i)\n\
+          else if (s == 'q')\n\
+            segs.replaceItem(SVG.parser.path.createSVGPathSegCurvetoQuadraticAbs(x, y, x1, y1), i)\n\
+          else if (s == 't')\n\
+            segs.replaceItem(SVG.parser.path.createSVGPathSegCurvetoQuadraticSmoothAbs(x, y), i)\n\
+          else if (s == 'a')\n\
+            segs.replaceItem(SVG.parser.path.createSVGPathSegArcAbs(x, y, seg.r1, seg.r2, seg.angle, seg.largeArcFlag, seg.sweepFlag), i)\n\
+          else if (s == 'z' || s == 'Z') {\n\
+            x = x0\n\
+            y = y0\n\
           }\n\
         }\n\
   \n\
         /* record the start of a subpath */\n\
-        if (/[Mm]/.test(s)) {\n\
+        if (s == 'M' || s == 'm') {\n\
           x0 = x\n\
           y0 = y\n\
         }\n\
@@ -2526,48 +2457,30 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
       /* build internal representation */\n\
       array = []\n\
-      segs = SVG.parser.path.pathSegList\n\
+      segs  = SVG.parser.path.pathSegList\n\
       \n\
       for (i = 0, il = segs.numberOfItems; i < il; ++i) {\n\
         seg = segs.getItem(i)\n\
-        s = {}\n\
+        s = seg.pathSegTypeAsLetter\n\
+        x = [s]\n\
   \n\
-        switch (seg.pathSegTypeAsLetter) {\n\
-          case 'M':\n\
-          case 'L':\n\
-          case 'T':\n\
-          case 'S':\n\
-          case 'Q':\n\
-          case 'C':\n\
-            if (/[QC]/.test(seg.pathSegTypeAsLetter)) {\n\
-              s.x1 = seg.x1\n\
-              s.y1 = seg.y1\n\
-            }\n\
-  \n\
-            if (/[SC]/.test(seg.pathSegTypeAsLetter)) {\n\
-              s.x2 = seg.x2\n\
-              s.y2 = seg.y2\n\
-            }\n\
-  \n\
-          break\n\
-          case 'A':\n\
-            s = {\n\
-              r1: seg.r1\n\
-            , r2: seg.r2\n\
-            , a:  seg.angle\n\
-            , l:  seg.largeArcFlag|0\n\
-            , s:  seg.sweepFlag|0\n\
-            }\n\
-          break\n\
-        }\n\
-  \n\
-        /* make the letter, x and y values accessible as key/values */\n\
-        s.type = seg.pathSegTypeAsLetter\n\
-        s.x = seg.x\n\
-        s.y = seg.y\n\
+        if (s == 'M' || s == 'L' || s == 'T')\n\
+          x.push(seg.x, seg.y)\n\
+        else if (s == 'H')\n\
+          x.push(seg.x)\n\
+        else if (s == 'V')\n\
+          x.push(seg.y)\n\
+        else if (s == 'C')\n\
+          x.push(seg.x1, seg.y1, seg.x2, seg.y2, seg.x, seg.y)\n\
+        else if (s == 'S')\n\
+          x.push(seg.x2, seg.y2, seg.x, seg.y)\n\
+        else if (s == 'Q')\n\
+          x.push(seg.x1, seg.y1, seg.x, seg.y)\n\
+        else if (s == 'A')\n\
+          x.push(seg.r1, seg.r2, seg.angle, seg.largeArcFlag|0, seg.sweepFlag|0, seg.x, seg.y)\n\
   \n\
         /* store segment */\n\
-        array.push(s)\n\
+        array.push(x)\n\
       }\n\
       \n\
       return array\n\
@@ -2580,6 +2493,43 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     }\n\
   \n\
   })\n\
+  \n\
+  // PathArray Helpers\n\
+  function arrayToString(a) {\n\
+    for (var i = 0, il = a.length, s = ''; i < il; i++) {\n\
+      s += a[i][0]\n\
+  \n\
+      if (a[i][1] != null) {\n\
+        s += a[i][1]\n\
+  \n\
+        if (a[i][2] != null) {\n\
+          s += ' '\n\
+          s += a[i][2]\n\
+  \n\
+          if (a[i][3] != null) {\n\
+            s += ' '\n\
+            s += a[i][3]\n\
+            s += ' '\n\
+            s += a[i][4]\n\
+  \n\
+            if (a[i][5] != null) {\n\
+              s += ' '\n\
+              s += a[i][5]\n\
+              s += ' '\n\
+              s += a[i][6]\n\
+  \n\
+              if (a[i][7] != null) {\n\
+                s += ' '\n\
+                s += a[i][7]\n\
+              }\n\
+            }\n\
+          }\n\
+        }\n\
+      }\n\
+    }\n\
+    \n\
+    return s + ' '\n\
+  }\n\
 \n\
   SVG.Number = function(value) {\n\
   \n\
@@ -3025,33 +2975,18 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
             this.node.removeAttribute(a)\n\
           \n\
         } else if (v == null) {\n\
-          /* act as a getter for style attributes */\n\
-          if (this._isStyle(a)) {\n\
-            return a == 'text' ?\n\
-                     this.content :\n\
-                   a == 'leading' && this.leading ?\n\
-                     this.leading() :\n\
-                     this.style(a)\n\
-          \n\
           /* act as a getter if the first and only argument is not an object */\n\
-          } else {\n\
-            v = this.node.getAttribute(a)\n\
-            return v == null ? \n\
-              SVG.defaults.attrs[a] :\n\
-            SVG.regex.test(v, 'isNumber') ?\n\
-              parseFloat(v) : v\n\
-          }\n\
+          v = this.node.getAttribute(a)\n\
+          return v == null ? \n\
+            SVG.defaults.attrs[a] :\n\
+          SVG.regex.test(v, 'isNumber') ?\n\
+            parseFloat(v) : v\n\
         \n\
         } else if (a == 'style') {\n\
           /* redirect to the style method */\n\
           return this.style(v)\n\
         \n\
         } else {\n\
-          /* treat x differently on text elements */\n\
-          if (a == 'x' && Array.isArray(this.lines))\n\
-            for (n = this.lines.length - 1; n >= 0; n--)\n\
-              this.lines[n].attr(a, v)\n\
-          \n\
           /* BUG FIX: some browsers will render a stroke if a color is given even though stroke width is 0 */\n\
           if (a == 'stroke-width')\n\
             this.attr('stroke', parseFloat(v) > 0 ? this._stroke : null)\n\
@@ -3070,7 +3005,7 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
           }\n\
           \n\
           /* ensure full hex color */\n\
-          if (SVG.Color.test(v) || SVG.Color.isRgb(v))\n\
+          if (SVG.Color.isColor(v))\n\
             v = new SVG.Color(v)\n\
   \n\
           /* ensure correct numeric values */\n\
@@ -3081,23 +3016,21 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
           else if (Array.isArray(v))\n\
             v = new SVG.Array(v)\n\
   \n\
-          /* set give attribute on node */\n\
-          n != null ?\n\
-            this.node.setAttributeNS(n, a, v.toString()) :\n\
-            this.node.setAttribute(a, v.toString())\n\
-          \n\
-          /* if the passed argument belongs in the style as well, add it there */\n\
-          if (this._isStyle(a)) {\n\
-            a == 'text' ?\n\
-              this.text(v) :\n\
-            a == 'leading' && this.leading ?\n\
-              this.leading(v) :\n\
-              this.style(a, v)\n\
-            \n\
-            /* rebuild if required */\n\
-            if (this.rebuild)\n\
-              this.rebuild(a, v)\n\
+          /* if the passed attribute is leading... */\n\
+          if (a == 'leading') {\n\
+            /* ... call the leading method instead */\n\
+            if (this.leading)\n\
+              this.leading(v)\n\
+          } else {\n\
+            /* set give attribute on node */\n\
+            n != null ?\n\
+              this.node.setAttributeNS(n, a, v.toString()) :\n\
+              this.node.setAttribute(a, v.toString())\n\
           }\n\
+          \n\
+          /* rebuild if required */\n\
+          if (this.rebuild && (a == 'font-size' || a == 'x'))\n\
+            this.rebuild(a, v)\n\
         }\n\
         \n\
         return this\n\
@@ -3265,10 +3198,6 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
           element = element.parent\n\
   \n\
         return element\n\
-      }\n\
-      // Private: tester method for style detection\n\
-    , _isStyle: function(a) {\n\
-        return typeof a == 'string' ? SVG.regex.test(a, 'isStyle') : false\n\
       }\n\
       // Private: parse a matrix string\n\
     , _parseMatrix: function(o) {\n\
@@ -3445,434 +3374,442 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     \n\
   })\n\
 \n\
-  SVG.FX = function(element) {\n\
-    /* store target element */\n\
-    this.target = element\n\
-  }\n\
+  SVG.FX = SVG.invent({\n\
+    // Initialize FX object\n\
+    create: function(element) {\n\
+      /* store target element */\n\
+      this.target = element\n\
+    }\n\
   \n\
-  SVG.extend(SVG.FX, {\n\
-    // Add animation parameters and start animation\n\
-    animate: function(d, ease, delay) {\n\
-      var akeys, tkeys, skeys, key\n\
-        , element = this.target\n\
-        , fx = this\n\
-      \n\
-      /* dissect object if one is passed */\n\
-      if (typeof d == 'object') {\n\
-        delay = d.delay\n\
-        ease = d.ease\n\
-        d = d.duration\n\
-      }\n\
-  \n\
-      /* ensure default duration and easing */\n\
-      d = d == '=' ? d : d == null ? 1000 : new SVG.Number(d).valueOf()\n\
-      ease = ease || '<>'\n\
-  \n\
-      /* process values */\n\
-      fx.to = function(pos) {\n\
-        var i\n\
-  \n\
-        /* normalise pos */\n\
-        pos = pos < 0 ? 0 : pos > 1 ? 1 : pos\n\
-  \n\
-        /* collect attribute keys */\n\
-        if (akeys == null) {\n\
-          akeys = []\n\
-          for (key in fx.attrs)\n\
-            akeys.push(key)\n\
-  \n\
-          /* make sure morphable elements are scaled, translated and morphed all together */\n\
-          if (element.morphArray && (fx._plot || akeys.indexOf('points') > -1)) {\n\
-            /* get destination */\n\
-            var box\n\
-              , p = new element.morphArray(fx._plot || fx.attrs.points || element.array)\n\
-  \n\
-            /* add size */\n\
-            if (fx._size) p.size(fx._size.width.to, fx._size.height.to)\n\
-  \n\
-            /* add movement */\n\
-            box = p.bbox()\n\
-            if (fx._x) p.move(fx._x.to, box.y)\n\
-            else if (fx._cx) p.move(fx._cx.to - box.width / 2, box.y)\n\
-  \n\
-            box = p.bbox()\n\
-            if (fx._y) p.move(box.x, fx._y.to)\n\
-            else if (fx._cy) p.move(box.x, fx._cy.to - box.height / 2)\n\
-  \n\
-            /* delete element oriented changes */\n\
-            delete fx._x\n\
-            delete fx._y\n\
-            delete fx._cx\n\
-            delete fx._cy\n\
-            delete fx._size\n\
-  \n\
-            fx._plot = element.array.morph(p)\n\
-          }\n\
-        }\n\
-  \n\
-        /* collect transformation keys */\n\
-        if (tkeys == null) {\n\
-          tkeys = []\n\
-          for (key in fx.trans)\n\
-            tkeys.push(key)\n\
-        }\n\
-  \n\
-        /* collect style keys */\n\
-        if (skeys == null) {\n\
-          skeys = []\n\
-          for (key in fx.styles)\n\
-            skeys.push(key)\n\
-        }\n\
-  \n\
-        /* apply easing */\n\
-        pos = ease == '<>' ?\n\
-          (-Math.cos(pos * Math.PI) / 2) + 0.5 :\n\
-        ease == '>' ?\n\
-          Math.sin(pos * Math.PI / 2) :\n\
-        ease == '<' ?\n\
-          -Math.cos(pos * Math.PI / 2) + 1 :\n\
-        ease == '-' ?\n\
-          pos :\n\
-        typeof ease == 'function' ?\n\
-          ease(pos) :\n\
-          pos\n\
+    // Add class methods\n\
+  , extend: {\n\
+      // Add animation parameters and start animation\n\
+      animate: function(d, ease, delay) {\n\
+        var akeys, tkeys, skeys, key\n\
+          , element = this.target\n\
+          , fx = this\n\
         \n\
-        /* run plot function */\n\
-        if (fx._plot) {\n\
-          element.plot(fx._plot.at(pos))\n\
-  \n\
-        } else {\n\
-          /* run all x-position properties */\n\
-          if (fx._x)\n\
-            element.x(at(fx._x, pos))\n\
-          else if (fx._cx)\n\
-            element.cx(at(fx._cx, pos))\n\
-  \n\
-          /* run all y-position properties */\n\
-          if (fx._y)\n\
-            element.y(at(fx._y, pos))\n\
-          else if (fx._cy)\n\
-            element.cy(at(fx._cy, pos))\n\
-  \n\
-          /* run all size properties */\n\
-          if (fx._size)\n\
-            element.size(at(fx._size.width, pos), at(fx._size.height, pos))\n\
+        /* dissect object if one is passed */\n\
+        if (typeof d == 'object') {\n\
+          delay = d.delay\n\
+          ease = d.ease\n\
+          d = d.duration\n\
         }\n\
   \n\
-        /* run all viewbox properties */\n\
-        if (fx._viewbox)\n\
-          element.viewbox(\n\
-            at(fx._viewbox.x, pos)\n\
-          , at(fx._viewbox.y, pos)\n\
-          , at(fx._viewbox.width, pos)\n\
-          , at(fx._viewbox.height, pos)\n\
-          )\n\
+        /* ensure default duration and easing */\n\
+        d = d == '=' ? d : d == null ? 1000 : new SVG.Number(d).valueOf()\n\
+        ease = ease || '<>'\n\
   \n\
-        /* animate attributes */\n\
-        for (i = akeys.length - 1; i >= 0; i--)\n\
-          element.attr(akeys[i], at(fx.attrs[akeys[i]], pos))\n\
+        /* process values */\n\
+        fx.to = function(pos) {\n\
+          var i\n\
   \n\
-        /* animate transformations */\n\
-        for (i = tkeys.length - 1; i >= 0; i--)\n\
-          element.transform(tkeys[i], at(fx.trans[tkeys[i]], pos))\n\
+          /* normalise pos */\n\
+          pos = pos < 0 ? 0 : pos > 1 ? 1 : pos\n\
   \n\
-        /* animate styles */\n\
-        for (i = skeys.length - 1; i >= 0; i--)\n\
-          element.style(skeys[i], at(fx.styles[skeys[i]], pos))\n\
+          /* collect attribute keys */\n\
+          if (akeys == null) {\n\
+            akeys = []\n\
+            for (key in fx.attrs)\n\
+              akeys.push(key)\n\
   \n\
-        /* callback for each keyframe */\n\
-        if (fx._during)\n\
-          fx._during.call(element, pos, function(from, to) {\n\
-            return at({ from: from, to: to }, pos)\n\
-          })\n\
-      }\n\
-      \n\
-      if (typeof d === 'number') {\n\
-        /* delay animation */\n\
-        this.timeout = setTimeout(function() {\n\
-          var start = new Date().getTime()\n\
+            /* make sure morphable elements are scaled, translated and morphed all together */\n\
+            if (element.morphArray && (fx._plot || akeys.indexOf('points') > -1)) {\n\
+              /* get destination */\n\
+              var box\n\
+                , p = new element.morphArray(fx._plot || fx.attrs.points || element.array)\n\
   \n\
-          /* initialize situation object */\n\
-          fx.situation = {\n\
-            interval: 1000 / 60\n\
-          , start:    start\n\
-          , play:     true\n\
-          , finish:   start + d\n\
-          , duration: d\n\
+              /* add size */\n\
+              if (fx._size) p.size(fx._size.width.to, fx._size.height.to)\n\
+  \n\
+              /* add movement */\n\
+              box = p.bbox()\n\
+              if (fx._x) p.move(fx._x.to, box.y)\n\
+              else if (fx._cx) p.move(fx._cx.to - box.width / 2, box.y)\n\
+  \n\
+              box = p.bbox()\n\
+              if (fx._y) p.move(box.x, fx._y.to)\n\
+              else if (fx._cy) p.move(box.x, fx._cy.to - box.height / 2)\n\
+  \n\
+              /* delete element oriented changes */\n\
+              delete fx._x\n\
+              delete fx._y\n\
+              delete fx._cx\n\
+              delete fx._cy\n\
+              delete fx._size\n\
+  \n\
+              fx._plot = element.array.morph(p)\n\
+            }\n\
           }\n\
   \n\
-          /* render function */\n\
-          fx.render = function(){\n\
-            \n\
-            if (fx.situation.play === true) {\n\
-              // This code was borrowed from the emile.js micro framework by Thomas Fuchs, aka MadRobby.\n\
-              var time = new Date().getTime()\n\
-                , pos = time > fx.situation.finish ? 1 : (time - fx.situation.start) / d\n\
-              \n\
-              /* process values */\n\
-              fx.to(pos)\n\
-              \n\
-              /* finish off animation */\n\
-              if (time > fx.situation.finish) {\n\
-                if (fx._plot)\n\
-                  element.plot(new SVG.PointArray(fx._plot.destination).settle())\n\
+          /* collect transformation keys */\n\
+          if (tkeys == null) {\n\
+            tkeys = []\n\
+            for (key in fx.trans)\n\
+              tkeys.push(key)\n\
+          }\n\
   \n\
-                if (fx._loop === true || (typeof fx._loop == 'number' && fx._loop > 1)) {\n\
-                  if (typeof fx._loop == 'number')\n\
-                    --fx._loop\n\
-                  fx.animate(d, ease, delay)\n\
+          /* collect style keys */\n\
+          if (skeys == null) {\n\
+            skeys = []\n\
+            for (key in fx.styles)\n\
+              skeys.push(key)\n\
+          }\n\
+  \n\
+          /* apply easing */\n\
+          pos = ease == '<>' ?\n\
+            (-Math.cos(pos * Math.PI) / 2) + 0.5 :\n\
+          ease == '>' ?\n\
+            Math.sin(pos * Math.PI / 2) :\n\
+          ease == '<' ?\n\
+            -Math.cos(pos * Math.PI / 2) + 1 :\n\
+          ease == '-' ?\n\
+            pos :\n\
+          typeof ease == 'function' ?\n\
+            ease(pos) :\n\
+            pos\n\
+          \n\
+          /* run plot function */\n\
+          if (fx._plot) {\n\
+            element.plot(fx._plot.at(pos))\n\
+  \n\
+          } else {\n\
+            /* run all x-position properties */\n\
+            if (fx._x)\n\
+              element.x(at(fx._x, pos))\n\
+            else if (fx._cx)\n\
+              element.cx(at(fx._cx, pos))\n\
+  \n\
+            /* run all y-position properties */\n\
+            if (fx._y)\n\
+              element.y(at(fx._y, pos))\n\
+            else if (fx._cy)\n\
+              element.cy(at(fx._cy, pos))\n\
+  \n\
+            /* run all size properties */\n\
+            if (fx._size)\n\
+              element.size(at(fx._size.width, pos), at(fx._size.height, pos))\n\
+          }\n\
+  \n\
+          /* run all viewbox properties */\n\
+          if (fx._viewbox)\n\
+            element.viewbox(\n\
+              at(fx._viewbox.x, pos)\n\
+            , at(fx._viewbox.y, pos)\n\
+            , at(fx._viewbox.width, pos)\n\
+            , at(fx._viewbox.height, pos)\n\
+            )\n\
+  \n\
+          /* animate attributes */\n\
+          for (i = akeys.length - 1; i >= 0; i--)\n\
+            element.attr(akeys[i], at(fx.attrs[akeys[i]], pos))\n\
+  \n\
+          /* animate transformations */\n\
+          for (i = tkeys.length - 1; i >= 0; i--)\n\
+            element.transform(tkeys[i], at(fx.trans[tkeys[i]], pos))\n\
+  \n\
+          /* animate styles */\n\
+          for (i = skeys.length - 1; i >= 0; i--)\n\
+            element.style(skeys[i], at(fx.styles[skeys[i]], pos))\n\
+  \n\
+          /* callback for each keyframe */\n\
+          if (fx._during)\n\
+            fx._during.call(element, pos, function(from, to) {\n\
+              return at({ from: from, to: to }, pos)\n\
+            })\n\
+        }\n\
+        \n\
+        if (typeof d === 'number') {\n\
+          /* delay animation */\n\
+          this.timeout = setTimeout(function() {\n\
+            var start = new Date().getTime()\n\
+  \n\
+            /* initialize situation object */\n\
+            fx.situation = {\n\
+              interval: 1000 / 60\n\
+            , start:    start\n\
+            , play:     true\n\
+            , finish:   start + d\n\
+            , duration: d\n\
+            }\n\
+  \n\
+            /* render function */\n\
+            fx.render = function(){\n\
+              \n\
+              if (fx.situation.play === true) {\n\
+                // This code was borrowed from the emile.js micro framework by Thomas Fuchs, aka MadRobby.\n\
+                var time = new Date().getTime()\n\
+                  , pos = time > fx.situation.finish ? 1 : (time - fx.situation.start) / d\n\
+                \n\
+                /* process values */\n\
+                fx.to(pos)\n\
+                \n\
+                /* finish off animation */\n\
+                if (time > fx.situation.finish) {\n\
+                  if (fx._plot)\n\
+                    element.plot(new SVG.PointArray(fx._plot.destination).settle())\n\
+  \n\
+                  if (fx._loop === true || (typeof fx._loop == 'number' && fx._loop > 1)) {\n\
+                    if (typeof fx._loop == 'number')\n\
+                      --fx._loop\n\
+                    fx.animate(d, ease, delay)\n\
+                  } else {\n\
+                    fx._after ? fx._after.apply(element, [fx]) : fx.stop()\n\
+                  }\n\
+  \n\
                 } else {\n\
-                  fx._after ? fx._after.apply(element, [fx]) : fx.stop()\n\
+                  requestAnimFrame(fx.render)\n\
                 }\n\
-  \n\
               } else {\n\
                 requestAnimFrame(fx.render)\n\
               }\n\
-            } else {\n\
-              requestAnimFrame(fx.render)\n\
+              \n\
             }\n\
+  \n\
+            /* start animation */\n\
+            fx.render()\n\
             \n\
-          }\n\
+          }, new SVG.Number(delay).valueOf())\n\
+        }\n\
+        \n\
+        return this\n\
+      }\n\
+      // Get bounding box of target element\n\
+    , bbox: function() {\n\
+        return this.target.bbox()\n\
+      }\n\
+      // Add animatable attributes\n\
+    , attr: function(a, v) {\n\
+        if (typeof a == 'object') {\n\
+          for (var key in a)\n\
+            this.attr(key, a[key])\n\
+        \n\
+        } else {\n\
+          var from = this.target.attr(a)\n\
   \n\
-          /* start animation */\n\
-          fx.render()\n\
+          this.attrs[a] = SVG.Color.isColor(from) ?\n\
+            new SVG.Color(from).morph(v) :\n\
+          SVG.regex.unit.test(from) ?\n\
+            new SVG.Number(from).morph(v) :\n\
+            { from: from, to: v }\n\
+        }\n\
+        \n\
+        return this\n\
+      }\n\
+      // Add animatable transformations\n\
+    , transform: function(o, v) {\n\
+        if (arguments.length == 1) {\n\
+          /* parse matrix string */\n\
+          o = this.target._parseMatrix(o)\n\
           \n\
-        }, new SVG.Number(delay).valueOf())\n\
-      }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Get bounding box of target element\n\
-  , bbox: function() {\n\
-      return this.target.bbox()\n\
-    }\n\
-    // Add animatable attributes\n\
-  , attr: function(a, v) {\n\
-      if (typeof a == 'object') {\n\
-        for (var key in a)\n\
-          this.attr(key, a[key])\n\
-      \n\
-      } else {\n\
-        var from = this.target.attr(a)\n\
-  \n\
-        this.attrs[a] = SVG.Color.isColor(from) ?\n\
-          new SVG.Color(from).morph(v) :\n\
-        SVG.regex.unit.test(from) ?\n\
-          new SVG.Number(from).morph(v) :\n\
-          { from: from, to: v }\n\
-      }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Add animatable transformations\n\
-  , transform: function(o, v) {\n\
-      if (arguments.length == 1) {\n\
-        /* parse matrix string */\n\
-        o = this.target._parseMatrix(o)\n\
-        \n\
-        /* dlete matrixstring from object */\n\
-        delete o.matrix\n\
-        \n\
-        /* store matrix values */\n\
-        for (v in o)\n\
-          this.trans[v] = { from: this.target.trans[v], to: o[v] }\n\
-        \n\
-      } else {\n\
-        /* apply transformations as object if key value arguments are given*/\n\
-        var transform = {}\n\
-        transform[o] = v\n\
-        \n\
-        this.transform(transform)\n\
-      }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Add animatable styles\n\
-  , style: function(s, v) {\n\
-      if (typeof s == 'object')\n\
-        for (var key in s)\n\
-          this.style(key, s[key])\n\
-      \n\
-      else\n\
-        this.styles[s] = { from: this.target.style(s), to: v }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Animatable x-axis\n\
-  , x: function(x) {\n\
-      this._x = { from: this.target.x(), to: x }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Animatable y-axis\n\
-  , y: function(y) {\n\
-      this._y = { from: this.target.y(), to: y }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Animatable center x-axis\n\
-  , cx: function(x) {\n\
-      this._cx = { from: this.target.cx(), to: x }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Animatable center y-axis\n\
-  , cy: function(y) {\n\
-      this._cy = { from: this.target.cy(), to: y }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Add animatable move\n\
-  , move: function(x, y) {\n\
-      return this.x(x).y(y)\n\
-    }\n\
-    // Add animatable center\n\
-  , center: function(x, y) {\n\
-      return this.cx(x).cy(y)\n\
-    }\n\
-    // Add animatable size\n\
-  , size: function(width, height) {\n\
-      if (this.target instanceof SVG.Text) {\n\
-        /* animate font size for Text elements */\n\
-        this.attr('font-size', width)\n\
-        \n\
-      } else {\n\
-        /* animate bbox based size for all other elements */\n\
-        var box = this.target.bbox()\n\
-  \n\
-        this._size = {\n\
-          width:  { from: box.width,  to: width  }\n\
-        , height: { from: box.height, to: height }\n\
+          /* dlete matrixstring from object */\n\
+          delete o.matrix\n\
+          \n\
+          /* store matrix values */\n\
+          for (v in o)\n\
+            this.trans[v] = { from: this.target.trans[v], to: o[v] }\n\
+          \n\
+        } else {\n\
+          /* apply transformations as object if key value arguments are given*/\n\
+          var transform = {}\n\
+          transform[o] = v\n\
+          \n\
+          this.transform(transform)\n\
         }\n\
-      }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Add animatable plot\n\
-  , plot: function(p) {\n\
-      this._plot = p\n\
-  \n\
-      return this\n\
-    }\n\
-    // Add animatable viewbox\n\
-  , viewbox: function(x, y, width, height) {\n\
-      if (this.target instanceof SVG.Container) {\n\
-        var box = this.target.viewbox()\n\
         \n\
-        this._viewbox = {\n\
-          x:      { from: box.x,      to: x      }\n\
-        , y:      { from: box.y,      to: y      }\n\
-        , width:  { from: box.width,  to: width  }\n\
-        , height: { from: box.height, to: height }\n\
+        return this\n\
+      }\n\
+      // Add animatable styles\n\
+    , style: function(s, v) {\n\
+        if (typeof s == 'object')\n\
+          for (var key in s)\n\
+            this.style(key, s[key])\n\
+        \n\
+        else\n\
+          this.styles[s] = { from: this.target.style(s), to: v }\n\
+        \n\
+        return this\n\
+      }\n\
+      // Animatable x-axis\n\
+    , x: function(x) {\n\
+        this._x = { from: this.target.x(), to: x }\n\
+        \n\
+        return this\n\
+      }\n\
+      // Animatable y-axis\n\
+    , y: function(y) {\n\
+        this._y = { from: this.target.y(), to: y }\n\
+        \n\
+        return this\n\
+      }\n\
+      // Animatable center x-axis\n\
+    , cx: function(x) {\n\
+        this._cx = { from: this.target.cx(), to: x }\n\
+        \n\
+        return this\n\
+      }\n\
+      // Animatable center y-axis\n\
+    , cy: function(y) {\n\
+        this._cy = { from: this.target.cy(), to: y }\n\
+        \n\
+        return this\n\
+      }\n\
+      // Add animatable move\n\
+    , move: function(x, y) {\n\
+        return this.x(x).y(y)\n\
+      }\n\
+      // Add animatable center\n\
+    , center: function(x, y) {\n\
+        return this.cx(x).cy(y)\n\
+      }\n\
+      // Add animatable size\n\
+    , size: function(width, height) {\n\
+        if (this.target instanceof SVG.Text) {\n\
+          /* animate font size for Text elements */\n\
+          this.attr('font-size', width)\n\
+          \n\
+        } else {\n\
+          /* animate bbox based size for all other elements */\n\
+          var box = this.target.bbox()\n\
+  \n\
+          this._size = {\n\
+            width:  { from: box.width,  to: width  }\n\
+          , height: { from: box.height, to: height }\n\
+          }\n\
         }\n\
-      }\n\
-      \n\
-      return this\n\
-    }\n\
-    // Add animateable gradient update\n\
-  , update: function(o) {\n\
-      if (this.target instanceof SVG.Stop) {\n\
-        if (o.opacity != null) this.attr('stop-opacity', o.opacity)\n\
-        if (o.color   != null) this.attr('stop-color', o.color)\n\
-        if (o.offset  != null) this.attr('offset', new SVG.Number(o.offset))\n\
-      }\n\
-  \n\
-      return this\n\
-    }\n\
-    // Add callback for each keyframe\n\
-  , during: function(during) {\n\
-      this._during = during\n\
-      \n\
-      return this\n\
-    }\n\
-    // Callback after animation\n\
-  , after: function(after) {\n\
-      this._after = after\n\
-      \n\
-      return this\n\
-    }\n\
-    // Make loopable\n\
-  , loop: function(times) {\n\
-      this._loop = times || true\n\
-  \n\
-      return this\n\
-    }\n\
-    // Stop running animation\n\
-  , stop: function() {\n\
-      /* stop current animation */\n\
-      clearTimeout(this.timeout)\n\
-      clearInterval(this.interval)\n\
-      \n\
-      /* reset storage for properties that need animation */\n\
-      this.attrs     = {}\n\
-      this.trans     = {}\n\
-      this.styles    = {}\n\
-      this.situation = {}\n\
-  \n\
-      delete this._x\n\
-      delete this._y\n\
-      delete this._cx\n\
-      delete this._cy\n\
-      delete this._size\n\
-      delete this._plot\n\
-      delete this._loop\n\
-      delete this._after\n\
-      delete this._during\n\
-      delete this._viewbox\n\
-  \n\
-      return this\n\
-    }\n\
-    // Pause running animation\n\
-  , pause: function() {\n\
-      if (this.situation.play === true) {\n\
-        this.situation.play  = false\n\
-        this.situation.pause = new Date().getTime()\n\
-      }\n\
-  \n\
-      return this\n\
-    }\n\
-    // Play running animation\n\
-  , play: function() {\n\
-      if (this.situation.play === false) {\n\
-        var pause = new Date().getTime() - this.situation.pause\n\
         \n\
-        this.situation.finish += pause\n\
-        this.situation.start  += pause\n\
-        this.situation.play    = true\n\
+        return this\n\
       }\n\
+      // Add animatable plot\n\
+    , plot: function(p) {\n\
+        this._plot = p\n\
   \n\
-      return this\n\
-    }\n\
-    \n\
-  })\n\
+        return this\n\
+      }\n\
+      // Add animatable viewbox\n\
+    , viewbox: function(x, y, width, height) {\n\
+        if (this.target instanceof SVG.Container) {\n\
+          var box = this.target.viewbox()\n\
+          \n\
+          this._viewbox = {\n\
+            x:      { from: box.x,      to: x      }\n\
+          , y:      { from: box.y,      to: y      }\n\
+          , width:  { from: box.width,  to: width  }\n\
+          , height: { from: box.height, to: height }\n\
+          }\n\
+        }\n\
+        \n\
+        return this\n\
+      }\n\
+      // Add animateable gradient update\n\
+    , update: function(o) {\n\
+        if (this.target instanceof SVG.Stop) {\n\
+          if (o.opacity != null) this.attr('stop-opacity', o.opacity)\n\
+          if (o.color   != null) this.attr('stop-color', o.color)\n\
+          if (o.offset  != null) this.attr('offset', new SVG.Number(o.offset))\n\
+        }\n\
   \n\
-  SVG.extend(SVG.Element, {\n\
-    // Get fx module or create a new one, then animate with given duration and ease\n\
-    animate: function(d, ease, delay) {\n\
-      return (this.fx || (this.fx = new SVG.FX(this))).stop().animate(d, ease, delay)\n\
-    }\n\
-    // Stop current animation; this is an alias to the fx instance\n\
-  , stop: function() {\n\
-      if (this.fx)\n\
-        this.fx.stop()\n\
+        return this\n\
+      }\n\
+      // Add callback for each keyframe\n\
+    , during: function(during) {\n\
+        this._during = during\n\
+        \n\
+        return this\n\
+      }\n\
+      // Callback after animation\n\
+    , after: function(after) {\n\
+        this._after = after\n\
+        \n\
+        return this\n\
+      }\n\
+      // Make loopable\n\
+    , loop: function(times) {\n\
+        this._loop = times || true\n\
+  \n\
+        return this\n\
+      }\n\
+      // Stop running animation\n\
+    , stop: function() {\n\
+        /* stop current animation */\n\
+        clearTimeout(this.timeout)\n\
+        clearInterval(this.interval)\n\
+        \n\
+        /* reset storage for properties that need animation */\n\
+        this.attrs     = {}\n\
+        this.trans     = {}\n\
+        this.styles    = {}\n\
+        this.situation = {}\n\
+  \n\
+        delete this._x\n\
+        delete this._y\n\
+        delete this._cx\n\
+        delete this._cy\n\
+        delete this._size\n\
+        delete this._plot\n\
+        delete this._loop\n\
+        delete this._after\n\
+        delete this._during\n\
+        delete this._viewbox\n\
+  \n\
+        return this\n\
+      }\n\
+      // Pause running animation\n\
+    , pause: function() {\n\
+        if (this.situation.play === true) {\n\
+          this.situation.play  = false\n\
+          this.situation.pause = new Date().getTime()\n\
+        }\n\
+  \n\
+        return this\n\
+      }\n\
+      // Play running animation\n\
+    , play: function() {\n\
+        if (this.situation.play === false) {\n\
+          var pause = new Date().getTime() - this.situation.pause\n\
+          \n\
+          this.situation.finish += pause\n\
+          this.situation.start  += pause\n\
+          this.situation.play    = true\n\
+        }\n\
+  \n\
+        return this\n\
+      }\n\
       \n\
-      return this\n\
     }\n\
-    // Pause current animation\n\
-  , pause: function() {\n\
-      if (this.fx)\n\
-        this.fx.pause()\n\
   \n\
-      return this\n\
-    }\n\
-    // Play paused current animation\n\
-  , play: function() {\n\
-      if (this.fx)\n\
-        this.fx.play()\n\
+    // Define parent class\n\
+  , parent: SVG.Element\n\
   \n\
-      return this\n\
+    // Add method to parent elements\n\
+  , construct: {\n\
+      // Get fx module or create a new one, then animate with given duration and ease\n\
+      animate: function(d, ease, delay) {\n\
+        return (this.fx || (this.fx = new SVG.FX(this))).stop().animate(d, ease, delay)\n\
+      }\n\
+      // Stop current animation; this is an alias to the fx instance\n\
+    , stop: function() {\n\
+        if (this.fx)\n\
+          this.fx.stop()\n\
+        \n\
+        return this\n\
+      }\n\
+      // Pause current animation\n\
+    , pause: function() {\n\
+        if (this.fx)\n\
+          this.fx.pause()\n\
+  \n\
+        return this\n\
+      }\n\
+      // Play paused current animation\n\
+    , play: function() {\n\
+        if (this.fx)\n\
+          this.fx.play()\n\
+  \n\
+        return this\n\
+      }\n\
+      \n\
     }\n\
-    \n\
   })\n\
   \n\
   // Calculate position according to from and to\n\
@@ -3898,29 +3835,17 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   })()\n\
 \n\
   SVG.extend(SVG.Element, SVG.FX, {\n\
-    // Relative methods\n\
-    relative: function() {\n\
-      var b, e = this\n\
-  \n\
-      return {\n\
-        // Move over x axis\n\
-        x: function(x) {\n\
-          b = e.bbox()\n\
-  \n\
-          return e.x(b.x + (x || 0))\n\
-        }\n\
-        // Move over y axis\n\
-      , y: function(y) {\n\
-          b = e.bbox()\n\
-  \n\
-          return e.y(b.y + (y || 0))\n\
-        }\n\
-        // Move over x and y axes\n\
-      , move: function(x, y) {\n\
-          this.x(x)\n\
-          return this.y(y)\n\
-        }\n\
-      }\n\
+    // Relative move over x axis\n\
+    dx: function(x) {\n\
+      return this.x(this.x() + x)\n\
+    }\n\
+    // Relative move over y axis\n\
+  , dy: function(y) {\n\
+      return this.y(this.y() + y)\n\
+    }\n\
+    // Relative move over x and y axes\n\
+  , dmove: function(x, y) {\n\
+      return this.dx(x).dy(y)\n\
     }\n\
   \n\
   })\n\
@@ -4381,11 +4306,11 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
       this._defs.parent = this\n\
       this.node.appendChild(this._defs.node)\n\
   \n\
-      /* turno of sub pixel offset by default */\n\
-      this.doSubPixelOffsetFix = false\n\
+      /* turn off sub pixel offset by default */\n\
+      this.doSpof = false\n\
       \n\
       /* ensure correct rendering */\n\
-      if (this.parent.nodeName != 'svg')\n\
+      if (this.parent != this.node)\n\
         this.stage()\n\
     }\n\
   \n\
@@ -4394,50 +4319,20 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
     // Add class methods\n\
   , extend: {\n\
-      // Hack for safari preventing text to be rendered in one line.\n\
-      // Basically it sets the position of the svg node to absolute\n\
-      // when the dom is loaded, and resets it to relative a few milliseconds later.\n\
-      // It also handles sub-pixel offset rendering properly.\n\
+      /* enable drawing */\n\
       stage: function() {\n\
-        var check\n\
-          , element = this\n\
-          , wrapper = document.createElement('div')\n\
+        var element = this\n\
   \n\
-        /* set temporary wrapper to position relative */\n\
-        wrapper.style.cssText = 'position:relative;height:100%;'\n\
+        /* insert element */\n\
+        this.parent.appendChild(this.node)\n\
   \n\
-        /* put element into wrapper */\n\
-        element.parent.appendChild(wrapper)\n\
-        wrapper.appendChild(element.node)\n\
-  \n\
-        /* check for dom:ready */\n\
-        check = function() {\n\
-          if (document.readyState === 'complete') {\n\
-            element.style('position:absolute;')\n\
-            setTimeout(function() {\n\
-              /* set position back to relative */\n\
-              element.style('position:relative;overflow:hidden;')\n\
-  \n\
-              /* remove temporary wrapper */\n\
-              element.parent.removeChild(element.node.parentNode)\n\
-              element.node.parentNode.removeChild(element.node)\n\
-              element.parent.appendChild(element.node)\n\
-  \n\
-              /* after wrapping is done, fix sub-pixel offset */\n\
-              element.subPixelOffsetFix()\n\
-              \n\
-              /* make sure sub-pixel offset is fixed every time the window is resized */\n\
-              SVG.on(window, 'resize', function() {\n\
-                element.subPixelOffsetFix()\n\
-              })\n\
-              \n\
-            }, 5)\n\
-          } else {\n\
-            setTimeout(check, 10)\n\
-          }\n\
-        }\n\
-  \n\
-        check()\n\
+        /* fix sub-pixel offset */\n\
+        element.spof()\n\
+        \n\
+        /* make sure sub-pixel offset is fixed every time the window is resized */\n\
+        SVG.on(window, 'resize', function() {\n\
+          element.spof()\n\
+        })\n\
   \n\
         return this\n\
       }\n\
@@ -4449,8 +4344,8 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
       // Fix for possible sub-pixel offset. See:\n\
       // https://bugzilla.mozilla.org/show_bug.cgi?id=608812\n\
-    , subPixelOffsetFix: function() {\n\
-        if (this.doSubPixelOffsetFix) {\n\
+    , spof: function() {\n\
+        if (this.doSpof) {\n\
           var pos = this.node.getScreenCTM()\n\
           \n\
           if (pos)\n\
@@ -4462,8 +4357,9 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
         return this\n\
       }\n\
   \n\
+      // Enable sub-pixel offset\n\
     , fixSubPixelOffset: function() {\n\
-        this.doSubPixelOffsetFix = true\n\
+        this.doSpof = true\n\
   \n\
         return this\n\
       }\n\
@@ -4749,7 +4645,7 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   , extend: {\n\
       // Plot new poly points\n\
       plot: function(p) {\n\
-        return this.attr('d', (this.array = new SVG.PathArray(p, [{ type:'M',x:0,y:0 }])))\n\
+        return this.attr('d', (this.array = new SVG.PathArray(p, [['M', 0, 0]])))\n\
       }\n\
       // Move by left top corner\n\
     , move: function(x, y) {\n\
@@ -4845,22 +4741,17 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     }\n\
   })\n\
 \n\
-  var _styleAttr = ('size family weight stretch variant style').split(' ')\n\
-  \n\
   SVG.Text = SVG.invent({\n\
     // Initialize node\n\
     create: function() {\n\
       this.constructor.call(this, SVG.create('text'))\n\
       \n\
-      /* define default style */\n\
-      this.styles = {\n\
-        'font-size':    16\n\
-      , 'font-family':  'Helvetica, Arial, sans-serif'\n\
-      , 'text-anchor':  'start'\n\
-      }\n\
-      \n\
-      this._leading = new SVG.Number('1.2em')\n\
-      this._rebuild = true\n\
+      this._leading = new SVG.Number(1.3) /* store leading value for rebuilding */\n\
+      this._rebuild = true                /* enable automatic updating of dy values */\n\
+      this._build   = false               /* disable build mode for adding multiple lines */\n\
+  \n\
+      /* set default font */\n\
+      this.attr('font-family', SVG.defaults.attrs['font-family'])\n\
     }\n\
   \n\
     // Inherit from\n\
@@ -4869,97 +4760,69 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     // Add class methods\n\
   , extend: {\n\
       // Move over x-axis\n\
-      x: function(x, a) {\n\
+      x: function(x) {\n\
         /* act as getter */\n\
         if (x == null)\n\
-          return a ? this.attr('x') : this.bbox().x\n\
+          return this.attr('x')\n\
         \n\
-        /* set x taking anchor in mind */\n\
-        if (!a) {\n\
-          a = this.style('text-anchor')\n\
-          x = a == 'start' ? x : a == 'end' ? x + this.bbox().width : x + this.bbox().width / 2\n\
-        }\n\
-  \n\
-        /* move lines as well if no textPath si present */\n\
+        /* move lines as well if no textPath is present */\n\
         if (!this.textPath)\n\
           this.lines.each(function() { if (this.newLined) this.x(x) })\n\
   \n\
         return this.attr('x', x)\n\
       }\n\
+      // Move over y-axis\n\
+    , y: function(y) {\n\
+        /* act as getter */\n\
+        if (y == null)\n\
+          return this.attr('y')\n\
+  \n\
+        return this.attr('y', y + this.attr('y') - this.bbox().y)\n\
+      }\n\
       // Move center over x-axis\n\
-    , cx: function(x, a) {\n\
+    , cx: function(x) {\n\
         return x == null ? this.bbox().cx : this.x(x - this.bbox().width / 2)\n\
       }\n\
       // Move center over y-axis\n\
-    , cy: function(y, a) {\n\
-        return y == null ? this.bbox().cy : this.y(a ? y : y - this.bbox().height / 2)\n\
+    , cy: function(y) {\n\
+        return y == null ? this.bbox().cy : this.y(y - this.bbox().height / 2)\n\
       }\n\
       // Move element to given x and y values\n\
-    , move: function(x, y, a) {\n\
-        return this.x(x, a).y(y)\n\
+    , move: function(x, y) {\n\
+        return this.x(x).y(y)\n\
       }\n\
       // Move element by its center\n\
-    , center: function(x, y, a) {\n\
-        return this.cx(x, a).cy(y, a)\n\
+    , center: function(x, y) {\n\
+        return this.cx(x).cy(y)\n\
       }\n\
       // Set the text content\n\
     , text: function(text) {\n\
         /* act as getter */\n\
-        if (text == null)\n\
-          return this.content\n\
+        if (!text) return this.content\n\
         \n\
-        /* remove existing lines */\n\
-        this.clear()\n\
+        /* remove existing content */\n\
+        this.clear().build(true)\n\
         \n\
         if (typeof text === 'function') {\n\
-          this._rebuild = false\n\
-  \n\
+          /* call block */\n\
           text.call(this, this)\n\
   \n\
         } else {\n\
-          this._rebuild = true\n\
-  \n\
-          /* make sure text is not blank */\n\
-          text = SVG.regex.isBlank.test(text) ? 'text' : text\n\
-          \n\
-          var i, il\n\
-            , lines = text.split('\\n\
+          /* store text and make sure text is not blank */\n\
+          text = (this.content = (SVG.regex.isBlank.test(text) ? 'text' : text)).split('\\n\
 ')\n\
           \n\
           /* build new lines */\n\
-          for (i = 0, il = lines.length; i < il; i++)\n\
-            this.tspan(lines[i]).newLine()\n\
-  \n\
-          this.rebuild()\n\
+          for (var i = 0, il = text.length; i < il; i++)\n\
+            this.tspan(text[i]).newLine()\n\
         }\n\
         \n\
-        return this\n\
-      }\n\
-      // Create a tspan\n\
-    , tspan: function(text) {\n\
-        var node  = this.textPath ? this.textPath.node : this.node\n\
-          , tspan = new SVG.TSpan().text(text)\n\
-          , style = this.style()\n\
-        \n\
-        /* add new tspan */\n\
-        node.appendChild(tspan.node)\n\
-        this.lines.add(tspan)\n\
-  \n\
-        /* add style if any */\n\
-        if (!SVG.regex.isBlank.test(style))\n\
-          tspan.style(style)\n\
-  \n\
-        /* store content */\n\
-        this.content += text\n\
-  \n\
-        /* store text parent */\n\
-        tspan.parent = this\n\
-  \n\
-        return tspan\n\
+        /* disable build mode and rebuild lines */\n\
+        return this.build(false).rebuild()\n\
       }\n\
       // Set font size\n\
     , size: function(size) {\n\
-        return this.attr('font-size', size)\n\
+        return this.attr('font-size', size).rebuild()\n\
       }\n\
       // Set / get leading\n\
     , leading: function(value) {\n\
@@ -4968,47 +4831,34 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
           return this._leading\n\
         \n\
         /* act as setter */\n\
-        value = new SVG.Number(value)\n\
-        this._leading = value\n\
+        this._leading = new SVG.Number(value)\n\
         \n\
-        /* apply leading */\n\
-        this.lines.each(function() {\n\
-          if (this.newLined)\n\
-            this.attr('dy', value)\n\
-        })\n\
-  \n\
-        return this\n\
+        return this.rebuild()\n\
       }\n\
-      // rebuild appearance type\n\
-    , rebuild: function() {\n\
+      // Rebuild appearance type\n\
+    , rebuild: function(rebuild) {\n\
         var self = this\n\
+  \n\
+        /* store new rebuild flag if given */\n\
+        if (typeof rebuild == 'boolean')\n\
+          this._rebuild = rebuild\n\
   \n\
         /* define position of all lines */\n\
         if (this._rebuild) {\n\
-          this.lines.attr({\n\
-            x:      this.attr('x')\n\
-          , dy:     this._leading\n\
-          , style:  this.style()\n\
+          this.lines.each(function() {\n\
+            if (this.newLined) {\n\
+              if (!this.textPath)\n\
+                this.attr('x', self.attr('x'))\n\
+              this.attr('dy', self._leading * new SVG.Number(self.attr('font-size'))) \n\
+            }\n\
           })\n\
         }\n\
   \n\
         return this\n\
       }\n\
-      // Clear all lines\n\
-    , clear: function() {\n\
-        var node = this.textPath ? this.textPath.node : this.node\n\
-  \n\
-        /* remove existing child nodes */\n\
-        while (node.hasChildNodes())\n\
-          node.removeChild(node.lastChild)\n\
-        \n\
-        /* refresh lines */\n\
-        delete this.lines\n\
-        this.lines = new SVG.Set\n\
-        \n\
-        /* initialize content */\n\
-        this.content = ''\n\
-  \n\
+      // Enable / disable build mode\n\
+    , build: function(build) {\n\
+        this._build = !!build\n\
         return this\n\
       }\n\
     }\n\
@@ -5019,7 +4869,12 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
       text: function(text) {\n\
         return this.put(new SVG.Text).text(text)\n\
       }\n\
+      // Create plain text element\n\
+    , plain: function(text) {\n\
+        return this.put(new SVG.Text).plain(text)\n\
+      }\n\
     }\n\
+  \n\
   })\n\
   \n\
   SVG.TSpan = SVG.invent({\n\
@@ -5033,8 +4888,8 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   , extend: {\n\
       // Set text content\n\
       text: function(text) {\n\
-        this.node.appendChild(document.createTextNode(text))\n\
-        \n\
+        typeof text === 'function' ? text.call(this, this) : this.plain(text)\n\
+  \n\
         return this\n\
       }\n\
       // Shortcut dx\n\
@@ -5047,14 +4902,67 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
       }\n\
       // Create new line\n\
     , newLine: function() {\n\
+        /* fetch text parent */\n\
+        var t = this.doc(SVG.Text)\n\
+  \n\
+        /* mark new line */\n\
         this.newLined = true\n\
-        this.parent.content += '\\n\
-'\n\
-        this.dy(this.parent._leading)\n\
-        return this.attr('x', this.parent.x())\n\
+  \n\
+        /* apply new hy¡n */\n\
+        return this.dy(t._leading * t.attr('font-size')).attr('x', t.x())\n\
       }\n\
     }\n\
     \n\
+  })\n\
+  \n\
+  SVG.extend(SVG.Text, SVG.TSpan, {\n\
+    // Create plain text node\n\
+    plain: function(text) {\n\
+      /* clear if build mode is disabled */\n\
+      if (this._build === false)\n\
+        this.clear()\n\
+  \n\
+      /* create text node */\n\
+      this.node.appendChild(document.createTextNode((this.content = text)))\n\
+      \n\
+      return this\n\
+    }\n\
+    // Create a tspan\n\
+  , tspan: function(text) {\n\
+      var node  = (this.textPath || this).node\n\
+        , tspan = new SVG.TSpan\n\
+  \n\
+      /* clear if build mode is disabled */\n\
+      if (this._build === false)\n\
+        this.clear()\n\
+      \n\
+      /* add new tspan and reference */\n\
+      node.appendChild(tspan.node)\n\
+      tspan.parent = this\n\
+  \n\
+      /* only first level tspans are considered to be \"lines\" */\n\
+      if (this instanceof SVG.Text)\n\
+        this.lines.add(tspan)\n\
+  \n\
+      return tspan.text(text)\n\
+    }\n\
+    // Clear all lines\n\
+  , clear: function() {\n\
+      var node = (this.textPath || this).node\n\
+  \n\
+      /* remove existing child nodes */\n\
+      while (node.hasChildNodes())\n\
+        node.removeChild(node.lastChild)\n\
+      \n\
+      /* reset content references  */\n\
+      if (this instanceof SVG.Text) {\n\
+        delete this.lines\n\
+        this.lines = new SVG.Set\n\
+        this.content = ''\n\
+      }\n\
+      \n\
+      return this\n\
+    }\n\
   })\n\
   \n\
 \n\
@@ -5169,30 +5077,27 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
     \n\
   })\n\
 \n\
-  SVG._stroke = ['color', 'width', 'opacity', 'linecap', 'linejoin', 'miterlimit', 'dasharray', 'dashoffset']\n\
-  SVG._fill   = ['color', 'opacity', 'rule']\n\
-  \n\
-  \n\
-  // Prepend correct color prefix\n\
-  var _colorPrefix = function(type, attr) {\n\
-    return attr == 'color' ? type : type + '-' + attr\n\
+  var sugar = {\n\
+    stroke: ['color', 'width', 'opacity', 'linecap', 'linejoin', 'miterlimit', 'dasharray', 'dashoffset']\n\
+  , fill:   ['color', 'opacity', 'rule']\n\
+  , prefix: function(t, a) {\n\
+      return a == 'color' ? t : t + '-' + a\n\
+    }\n\
   }\n\
   \n\
   /* Add sugar for fill and stroke */\n\
-  ;['fill', 'stroke'].forEach(function(method) {\n\
-    var extension = {}\n\
+  ;['fill', 'stroke'].forEach(function(m) {\n\
+    var i, extension = {}\n\
     \n\
-    extension[method] = function(o) {\n\
-      var indexOf\n\
-      \n\
+    extension[m] = function(o) {\n\
       if (typeof o == 'string' || SVG.Color.isRgb(o) || (o && typeof o.fill === 'function'))\n\
-        this.attr(method, o)\n\
+        this.attr(m, o)\n\
   \n\
       else\n\
-        /* set all attributes from _fillAttr and _strokeAttr list */\n\
-        for (index = SVG['_' + method].length - 1; index >= 0; index--)\n\
-          if (o[SVG['_' + method][index]] != null)\n\
-            this.attr(_colorPrefix(method, SVG['_' + method][index]), o[SVG['_' + method][index]])\n\
+        /* set all attributes from sugar.fill and sugar.stroke list */\n\
+        for (i = sugar[m].length - 1; i >= 0; i--)\n\
+          if (o[sugar[m][i]] != null)\n\
+            this.attr(sugar.prefix(m, sugar[m][i]), o[sugar[m][i]])\n\
       \n\
       return this\n\
     }\n\
@@ -5242,7 +5147,7 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   \n\
   })\n\
   \n\
-  SVG.extend(SVG.Rect, SVG.Ellipse, {\n\
+  SVG.extend(SVG.Rect, SVG.Ellipse, SVG.FX, {\n\
     // Add x and y radius\n\
     radius: function(x, y) {\n\
       return this.attr({ rx: x, ry: y || x })\n\
@@ -5265,12 +5170,14 @@ require.register("wout-svg.js/dist/svg.js", Function("exports, require, module",
   SVG.extend(SVG.Text, SVG.FX, {\n\
     // Set font \n\
     font: function(o) {\n\
-      for (var key in o)\n\
-        key == 'anchor' ?\n\
-          this.attr('text-anchor', o[key]) :\n\
-        _styleAttr.indexOf(key) > -1 ?\n\
-          this.attr('font-'+ key, o[key]) :\n\
-          this.attr(key, o[key])\n\
+      for (var k in o)\n\
+        k == 'leading' ?\n\
+          this.leading(o[k]) :\n\
+        k == 'anchor' ?\n\
+          this.attr('text-anchor', o[k]) :\n\
+        k == 'size' || k == 'family' || k == 'weight' || k == 'stretch' || k == 'variant' || k == 'style' ?\n\
+          this.attr('font-'+ k, o[k]) :\n\
+          this.attr(k, o[k])\n\
       \n\
       return this\n\
     }\n\
@@ -11262,7 +11169,6 @@ jsmpeg.prototype.load = function( url ) {\n\
 \t\t}\n\
 \t};\n\
 \trequest.onprogress = this.updateLoader.bind(this);\n\
-\tconsole.log('GET', url);\n\
 \n\
 \trequest.open('GET', url);\n\
 \trequest.responseType = \"arraybuffer\";\n\
@@ -13762,9 +13668,8 @@ canvas.style.zIndex = 0;\n\
 //canvas.height = document.body.clientHeight;\n\
 \n\
 // Setup the WebSocket connection and start the player\n\
-//var client = new WebSocket('ws://192.168.34.168:8084/');\t\t//TODO: get local/external IP address\n\
-//console.log('created websocket client', client instanceof WebSocket);\n\
-//var player = new jsmpeg(client, {canvas:canvas});\n\
+var client = new WebSocket('ws://192.168.34.168:8084/');\t\t//TODO: get local/external IP address\n\
+var player = new jsmpeg(client, {canvas:canvas});\n\
 \n\
 /**\n\
  * Hardcoded lab box dimensions.\n\
