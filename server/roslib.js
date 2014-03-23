@@ -76,9 +76,9 @@ WebSocket.prototype.close = function() {
 };
 
 WebSocket.prototype.send = function(messageJson) {
-  this.wsconn.sendText(JSON.stringify(messageJson));
+//  this.wsconn.sendText(JSON.stringify(messageJson));
+  this.wsconn.sendText(messageJson);
 };
-
 /*
  * NOTE AFTER THIS ALL CODE IS COPIED IN FOR NODE.JS FROM CLIENT FILES TO CREATE roslibjs.js (A Node npm usable module)
  *
@@ -589,7 +589,7 @@ ROSLIB.Ros.prototype.callOnConnection = function(message) {
   var that = this;
   var messageJson = JSON.stringify(message);
 
-  if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+  if (!this.socket || this.socket.readyState !== 1) {//WebSocket.OPEN) {
     that.once('connection', function() {
       that.socket.send(messageJson);
     });
