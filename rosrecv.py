@@ -14,8 +14,8 @@ def textcb(msg):
 
 def init_ros_listener():
     rospy.init_node('xyz_listener', anonymous=True)
-    rospy.Subscriber('cmd_move_xyz', Twist, cmd_move_callback)
-    rospy.Subscriber('text', String, textcb)    
+    rospy.Subscriber('/cmd_move_xyz', Twist, cmd_move_callback)
+    rospy.Subscriber('/text', String, textcb)    
     rospy.spin()
 
 init_ros_listener()
