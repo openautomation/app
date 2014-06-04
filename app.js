@@ -42,10 +42,11 @@ app.use(route.post('/run', actions.create));
 app.use(route.get('/move', require('./controllers/move.js')));
 
 /*
-// dynamically include the controllers
+// dynamically include the controllers and let them register routes
 fs.readdirSync('./controllers').forEach(function (file) {
   if(file.substr(-3) == '.js') {
     module = require('./controllers/' + file);
+    //pass server to controller so controller can register its routes
     module.controller(app);
   }
 });*/

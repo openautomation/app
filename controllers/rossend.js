@@ -9,6 +9,9 @@ ros.on('error', function(error) {
 // Find out exactly when we made a connection.
 ros.on('connection', function() {
   console.log('Connection made!');
+  
+  cmdText = new ROSLIB.Topic({ ros:ros, name:'/text', messageType:'std_msgs/String' });
+  cmdText.publish(new ROSLIB.Message({ data:'hi' }));  
 
   // Publishing a Topic
   // ------------------
@@ -16,7 +19,7 @@ ros.on('connection', function() {
   // First, we create a Topic object with details of the topic's name and message type.
   var cmdVel = new ROSLIB.Topic({
     ros : ros,
-    name : 'cmd_move_xyz',
+    name : '/cmd_move_xyz',
     messageType : 'geometry_msgs/Twist'
   });
 
@@ -37,11 +40,6 @@ ros.on('connection', function() {
 
   // And finally, publish.
   cmdVel.publish(twist);
-
-
-  var cmdText = new ROSLIB.Topic({ ros:ros, name:'text', messageType:'std_msgs/String' });
-  cmdText.publish(new ROSLIB.Message({ data:'hi' }));
-
 });
 
 // Create a connection to the rosbridge WebSocket server.
